@@ -50,16 +50,18 @@ class GameRules:
     def makeSuggestion(self, player, perp, weapon, room):
         playerPos = self.players.index(player) 
         i = playerPos +1
+        if(i==len(self.players)):
+                i =0
         while(i!= playerPos):
-            if(i==len(self.players)):
-                i=0
             print(self.players[i])
             cardShown = self.players[i].hasACard(perp, weapon, room)
             if(cardShown!=None):
                 return self.players[i], cardShown 
             else:
                 i+=1
-            time.sleep(1)    
+            if(i==len(self.players)):
+                i=0    
+            time.sleep(1)   
         return None, None
     
     def dealCards(self):
@@ -70,12 +72,8 @@ class GameRules:
             self.players[playerIter].isDealt(self.deck.get(card))
             playerIter+=1
             if(playerIter==len(self.players)):
-                playerIter =0
-        
-        for player in self.players:
-            print(player)
-            print(player.cards) 
-        
+                playerIter = 0
+                       
     def checkAllPlayers(self):
         count =0
         for player in self.players:

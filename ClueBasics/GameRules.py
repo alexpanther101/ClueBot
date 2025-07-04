@@ -13,7 +13,7 @@ class GameRules:
         self.weaponCards = {}
         self.roomCards = {}
         self.deck = {}
-        
+        self.suggestionLog = []
         for card in self.SUSPECTS:
             suspect = Card("Suspect", card)
             self.suspectCards[card] = suspect
@@ -48,6 +48,8 @@ class GameRules:
         return False
     
     def makeSuggestion(self, player, perp, weapon, room):
+        print(f"{player.name} suggests: {perp}, {weapon}, in {room}")
+        self.suggestionLog.append(player, perp, weapon, room)
         playerPos = self.players.index(player) 
         i = playerPos +1
         if(i==len(self.players)):

@@ -66,14 +66,7 @@ class Player:
         
         if(owner!=None):
             if(len(self.ownersAndCards[owner])<owner.getNumCards()):
-                self.owners[owner].insert(0, card)
-                if(card.getType() == 'Suspect'):
-                    self.possibleSuspects.remove(card)
-                
-                elif (card.getType() == 'Weapon'):
-                    self.possibleWeapons.remove(card)
-                
-                else: self.possibleRooms.remove(card)
+                self.crossOff(owner, card)
 
             else:
                 print(owner+ "seems to already have "+ len(self.ownersAndCards[owner]) + "cards. There was a mistake in tracking cards")
@@ -100,7 +93,7 @@ class Player:
         weapon = random.choice(self.possibleWeapons)
         room = random.choice(self.possibleRooms)
 
-        print(f"{self.name} suggests: {suspect}, {weapon}, in {room}")
+       
         owner, card = self.game.makeSuggestion(self, suspect, weapon, room)
 
         if owner is None:

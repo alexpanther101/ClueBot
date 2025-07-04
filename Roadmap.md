@@ -1,125 +1,154 @@
-📦 Phase 1: Core Clue Engine
-Goal: Build a simplified but complete Clue game engine suitable for AI self-play.
+Phase 1: Core Game Simulation
+🎯 Goal: Build a functional virtual version of Clue that bots can play
 
-✅ Deliverables
-Card setup logic (suspects, weapons, rooms)
+Game Setup
 
-Solution envelope creation (1 of each type)
+Implement GameRules class
 
-Player hand distribution
+Define Player class (can be bot or human)
 
-Turn-based loop with suggestion, response, accusation
+Randomly select solution cards (1 suspect, 1 weapon, 1 room)
 
-Rules enforcement
+Shuffle and deal the rest to players
 
-🔧 Tools
-Python (base)
+Game Loop
 
-NumPy (for simulation efficiency)
+Turn-based structure
 
-🧩 Phase 2: Tabular CFR Engine
-Goal: Implement baseline CFR with regret matching and information sets.
+On each turn, allow:
 
-✅ Deliverables
-Information set class
+Suggestion (suspect, weapon, room)
 
-Tabular CFR loop with regret tracking
+Response (next player shows one matching card if any)
 
-Regret-matching strategy computation
+(Optional) Accusation
 
-Self-play loop
+Card Visibility
 
-Average strategy tracking
+Track cards in each player’s hand
 
-🧠 Optional Features
-Abstract action space (only reasonable suggestions)
+Track which card is shown to which player
 
-Simplified board state encoding
+Add a suggestion log: who suggested what, who showed what (or didn’t)
 
-🤖 Phase 3: Add Reinforcement Learning (RL)
-Goal: Enable learning through value estimation and exploration.
+Game End Condition
 
-✅ Deliverables
-Define state/action/reward structure
+Correct accusation → win
 
-Implement RL value function (Q-table or DQN)
+(Optional) Track failed accusations, eliminate that player from future turns
 
-Define reward shaping logic:
+🔍 Phase 2: Information Tracking & Belief Modeling
+🎯 Goal: Give bots memory and reasoning capabilities
 
-+1 for correct accusation
+Suggestion History
 
--1 for false accusation
+Log every suggestion (who suggested, what cards, who responded, what was shown)
 
-+0.1 for successful deduction
+Each player gets their own copy of visible history
 
-+0.2 for misleading an opponent
+Card Likelihood Matrix
 
-Integrate into CFR loop as:
+For each player and each card, store a probability they have it:
 
-Value critic for action evaluation
+python
+Copy code
+belief[player_id][card] = float
+Update beliefs based on:
 
-Opponent response prediction
+Known hands
 
-Accusation policy refinement
+Suggestions
 
-🧠 Phase 4: Probabilistic Deduction Engine
-Goal: Use probability to update beliefs and reason under uncertainty.
+Responses (or lack thereof)
 
-✅ Deliverables
-Belief matrix (Card × Player → Probability)
+Shown cards
 
-Bayesian update logic after each suggestion/response
+Elimination Inference
 
-Incorporate beliefs into CFR action selection and RL reward signals
+If Player A suggests (Plum, Knife, Kitchen)
 
-⚔️ Phase 5: Game-Theoretic Strategy Enhancements
-Goal: Enable mixed strategies, deception, and adversarial play.
+Player B responds, but I already hold Knife and Kitchen → they must have Plum
 
-✅ Deliverables
-Track and use mixed strategies (via CFR)
+🎓 Phase 3: Bot Architecture
+🎯 Goal: Add logic-based and learning-based bots
 
-Bluff-aware logic (detect when players suggest cards they own)
+Rule-Based Bot
 
-Entropy-regularized decision-making (RL + game theory fusion)
+Uses deduction to eliminate suspects
 
-Explore alternative game-theoretic models:
+Chooses suggestions to maximize new information
 
-Quantal Response Equilibrium (QRE)
+Random Bot
 
-Minimax Regret
+Selects suggestions randomly (good as baseline opponent)
 
-🧠 Phase 6: Deep CFR + Neural Generalization
-Goal: Scale to large games using function approximation.
+Learning Bot
 
-✅ Deliverables
-Replace regret tables with neural networks:
+Wrap game logic in an RL-compatible interface:
 
-RegretNet (input: info set → output: regret values)
+get_state()
 
-StrategyNet (input: info set → output: action probabilities)
+get_legal_actions()
 
-Sample trajectories → store in replay buffer → train via mini-batch updates
+step(action)
 
-Incorporate game history via:
+get_reward()
 
-MLP (basic)
+🧠 Phase 4: Reinforcement Learning Integration
+🎯 Goal: Train bots to improve strategy over time
 
-LSTM (sequence modeling)
+Define State Representation
 
-Transformer (if needed)
+Your hand
 
-🎮 Phase 7: Evaluation & Opponent Testing
-Goal: Measure performance and exploitability.
+Cards you've seen
 
-✅ Deliverables
-Evaluation vs. random, logic-based, and humanlike bots
+Belief matrix
 
-Metrics:
+Suggestion history
 
-Win rate
+Turn number or phase
 
-Average number of turns
+Define Action Space
 
-Accuracy of deductions
+Suggestions: all combinations of suspect/weapon/room
 
-Bluff detection rate
+Accusation (optional)
+
+Movement (if you later model the board)
+
+Define Reward Signal
+
+Win = +1
+
+Loss = 0 or -1
+
+Bonus: Reward inference accuracy or information gain
+
+Implement RL Agent
+
+Start with DQN, PPO, or policy gradient
+
+Train via self-play
+
+♟ Phase 5: Game Theory & Advanced Inference
+🎯 Goal: Add strategic, opponent-aware intelligence
+
+Counterfactual Regret Minimization (CFR)
+
+Model Clue as a multi-agent extensive-form game
+
+Implement CFR on top of simulator
+
+Opponent Modeling
+
+Track tendencies: Do they bluff? Reuse same suggestions?
+
+Update beliefs about opponents' beliefs
+
+Deception/Bait Strategies
+
+Train bots to mislead others (suggest known cards)
+
+Detect such behavior in others
+

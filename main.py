@@ -9,8 +9,7 @@ if __name__ == "__main__":
     
     # Now update references
     for p in dummy_players:
-        p.game = game
-        p.setOpponents([op for op in dummy_players if op != p])
+            p.setOpponents([op for op in dummy_players if op != p])
     
     game.players = dummy_players
     game.gameLoop()

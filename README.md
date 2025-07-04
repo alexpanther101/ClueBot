@@ -9,3 +9,4 @@ Dev Env Set Up instructions - using Visual Studio Code for edits:
 3) Then in VScode, open the desired folder you want to store the repo in, and click on terminal -> New terminal. 
 4) Once you are in the right folder in terminal, type "git clone <link you just copied>" and hit enter. The repo should create itself under the folder you created. 
 
+In order to run the program, go to the terminal and type python main.py~

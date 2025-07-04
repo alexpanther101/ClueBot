@@ -1,5 +1,6 @@
+import time 
 import random
-import Card
+from .Card import Card
 class GameRules:
     ROOMS = ["Study", "Hall", "Lounge", "Library", "Billiard Room", "Dining Room", "Conservatory", "Ballroom", "Kitchen"]
     SUSPECTS = ["Colonel Mustard", "Reverend Green", "Miss Scarlet", "Mrs. Peacock", "Mrs White", "Professor Plum" ]
@@ -28,9 +29,9 @@ class GameRules:
             self.deck[card] = room
                     
         self.solution = {
-            "Suspect" : random.choice(self.suspectCards),
-            "Weapon" : random.choice(self.weaponCards),
-            "Room" : random.choice(self.roomCards)
+            "Suspect" : random.choice(list(self.suspectCards.values())),
+            "Weapon" : random.choice(list(self.weaponCards.values())),
+            "Room" : random.choice(list(self.roomCards.values()))
         }
         
         #Take out solution cards from deck
@@ -40,7 +41,8 @@ class GameRules:
         
         
     def makeAccusation(self, player, perp, weapon, room):
-        if(self.solution.get("Suspect") == perp & self.solution.get("Weapon") == weapon & self.solution.get("Room") == room):
+        print((player.name) + " accuses " + perp.name + " with a " + weapon.name + " in the "+room.name)
+        if(self.solution.get("Suspect") == perp and self.solution.get("Weapon") == weapon and self.solution.get("Room") == room):
             return True
         player.inGame = False
         return False
@@ -51,12 +53,13 @@ class GameRules:
         while(i!= playerPos):
             if(i==len(self.players)):
                 i=0
+            print(self.players[i])
             cardShown = self.players[i].hasACard(perp, weapon, room)
             if(cardShown!=None):
                 return self.players[i], cardShown 
             else:
                 i+=1
-                
+            time.sleep(1)    
         return None, None
     
     def dealCards(self):
@@ -64,5 +67,37 @@ class GameRules:
         random.shuffle(deckCards)
         playerIter =0
         for card in deckCards:
-            self.players[playerIter].isDealt(card)
-                
+            self.players[playerIter].isDealt(self.deck.get(card))
+            playerIter+=1
+            if(playerIter==len(self.players)):
+                playerIter =0
+        
+        for player in self.players:
+            print(player)
+            print(player.cards) 
+        
+    def checkAllPlayers(self):
+        count =0
+        for player in self.players:
+            if(player.inGame):
+                count+=1
+            if(count > 1):
+                return True
+        return False
+    
+    def findWinner(self):
+        for player in self.players:
+            if(player.inGame):
+                return player
+            
+    def gameLoop(self):
+        self.dealCards()
+        while(True):
+            if not (self.checkAllPlayers()):
+                break
+            
+            for player in self.players:
+                player.playTurn()
+    
+    
+  

@@ -104,10 +104,10 @@ class Player:
         if owner is None:
             print(f"No one disproved. {self.name} might try an accusation!")
             if self.makeAccusation(perp, weapon, room):
-                print(f"{self.name} WINS! The solution was correct.")
-                exit(0)
+                return self.name
             else:
                 print(f"{self.name} made a wrong accusation and is out.")
+                self.inGame = False
         else:
             print(f"{owner.name} showed a card.")
             self.crossOff(owner, card)

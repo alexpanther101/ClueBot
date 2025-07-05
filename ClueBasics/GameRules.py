@@ -97,7 +97,12 @@ class GameRules:
                 break
             
             for player in self.players:
-                player.playTurn()
+                winner = player.playTurn()
+                if(winner):
+                    print(f"{player.name} is the winner!")
+                    return
+                
+                    
     
     
   

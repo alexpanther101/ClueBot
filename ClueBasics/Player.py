@@ -61,7 +61,14 @@ class Player:
     def makeAccusation(self, perp, weapon, room):
         return self.game.makeAccusation(self, perp, weapon, room)
     
+    def chooseSuggestion(self):
+        suspect = random.choice(self.possibleSuspects)
+        weapon = random.choice(self.possibleWeapons)
+        room = random.choice(self.possibleRooms)
+        return suspect, weapon, room
+        
     def makeSuggestion(self, perp, weapon, room):
+        
         owner, card = self.game.makeSuggestion(self, perp, weapon, room)
         
         if(owner!=None):
@@ -89,16 +96,14 @@ class Player:
     
         # For demo purposes, randomly suggest or accuse
         # You can replace this with smarter logic later
-        suspect = random.choice(self.possibleSuspects)
-        weapon = random.choice(self.possibleWeapons)
-        room = random.choice(self.possibleRooms)
+        
 
-       
-        owner, card = self.game.makeSuggestion(self, suspect, weapon, room)
+        perp, weapon, room = self.chooseSuggestion()
+        owner, card = self.game.makeSuggestion(self, perp, weapon, room)
 
         if owner is None:
             print(f"No one disproved. {self.name} might try an accusation!")
-            if self.makeAccusation(suspect, weapon, room):
+            if self.makeAccusation(perp, weapon, room):
                 print(f"{self.name} WINS! The solution was correct.")
                 exit(0)
             else:

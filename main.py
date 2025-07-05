@@ -1,6 +1,6 @@
 # main.py
 from ClueBasics import GameRules, Player
-#testing commitsß
+#testing commit
 if __name__ == "__main__":
     player_names = ["Alice", "Bob", "Charlie"]
     game = GameRules(players=[])

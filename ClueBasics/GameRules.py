@@ -49,7 +49,7 @@ class GameRules:
     
     def makeSuggestion(self, player, perp, weapon, room):
         print(f"{player.name} suggests: {perp}, {weapon}, in {room}")
-        self.suggestionLog.append(player, perp, weapon, room)
+        self.suggestionLog.append(player.name + " " + perp.name + " " + weapon.name + " " + room.name)
         playerPos = self.players.index(player) 
         i = playerPos +1
         if(i==len(self.players)):

@@ -100,6 +100,7 @@ class GameRules:
                 winner = player.playTurn()
                 if(winner):
                     print(f"{player.name} is the winner!")
+                    print(player.ownersAndCards)
                     return
                 
                     

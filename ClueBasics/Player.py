@@ -3,7 +3,7 @@ import random
 from .Card import Card
 class Player:
     
-    def __init__(self, name, game, opponents):
+    def __init__(self, name, game):
         self.name = name
         self.game = game
         self.possibleSuspects = list(game.suspectCards.values())
@@ -25,10 +25,24 @@ class Player:
     def setOpponents(self, opponents):
         self.opponents = opponents
         self.ownersAndCards = dict.fromkeys(opponents)
-        for opponent in self.opponents: 
-            self.ownersAndCards[opponent] = []
-        self.ownersAndCards[self] = []   
+        cardMatrixLen = len(self.possibleRooms)+len(self.possibleSuspects)+len(self.possibleWeapons)
         
+        #Create belief matrix for each opponent - mapping each owner's card to a belief 
+        for opponent in self.opponents: 
+            self.ownersAndCards[opponent] = {}    
+        
+        
+            for card in self.possibleSuspects:
+                self.ownersAndCards[opponent][card] = 1/cardMatrixLen
+            
+            for card in self.possibleWeapons:
+                self.ownersAndCards[opponent][card] = 1/cardMatrixLen
+                
+            for card in self.possibleRooms:
+                self.ownersAndCards[opponent][card] = 1/cardMatrixLen
+                #need to update that probability when cards start to fill up
+        
+        self.ownersAndCards[self] = {}
     
     #Removes cards from possible solutions and maps to owner
     def crossOffMulti(self, owner, cardList):
@@ -42,7 +56,11 @@ class Player:
             else:
                 self.possibleRooms.remove(card)
         
-        self.ownersAndCards[owner].append(card)
+            self.ownersAndCards[owner][card] = 1
+        
+            for op in self.opponents:
+                self.ownersAndCards[op][card] = 0    
+        
         
     def crossOff(self, owner, card):
         if(card.getType() == 'Suspect'):
@@ -54,10 +72,14 @@ class Player:
         else: 
                 self.possibleRooms.remove(card)
         
-        self.ownersAndCards[owner].append(card)
+        for op in self.opponents:
+            self.ownersAndCards[op][card] = 0
+        
+        self.ownersAndCards[owner][card] = 1
+        
+        
         
     #Possible moves and helpers    
-        
     def makeAccusation(self, perp, weapon, room):
         return self.game.makeAccusation(self, perp, weapon, room)
     

@@ -1,87 +1,68 @@
 Phase 1: Core Game Simulation
 🎯 Goal: Build a functional virtual version of Clue that bots can play
 
-Game Setup
+1. Game Setup
 
-Implement GameRules class
+    Implement GameRules class
 
-Define Player class (can be bot or human)
+    Define Player class (can be bot or human)
 
-Randomly select solution cards (1 suspect, 1 weapon, 1 room)
+    Randomly select solution cards (1 suspect, 1 weapon, 1 room)
 
-Shuffle and deal the rest to players
+    Shuffle and deal the rest to players
 
-Game Loop
+    Game Loop
 
-Turn-based structure
+        Turn-based structure
 
-On each turn, allow:
+        On each turn, allow:
 
-Suggestion (suspect, weapon, room)
+        Suggestion (suspect, weapon, room)
 
-Response (next player shows one matching card if any)
+    Response (next player shows one matching card if any)
 
-(Optional) Accusation
+    Card Visibility
 
-Card Visibility
+        Track cards in each player’s hand
 
-Track cards in each player’s hand
+        Track which card is shown to which player
 
-Track which card is shown to which player
+        Add a suggestion log: who suggested what, who showed what (or didn’t)
 
-Add a suggestion log: who suggested what, who showed what (or didn’t)
+    Game End Condition
 
-Game End Condition
+        Correct accusation → win
 
-Correct accusation → win
 
-(Optional) Track failed accusations, eliminate that player from future turns
 
 🔍 Phase 2: Information Tracking & Belief Modeling
 🎯 Goal: Give bots memory and reasoning capabilities
 
-Suggestion History
+2. Suggestion History
 
-Log every suggestion (who suggested, what cards, who responded, what was shown)
+        Log every suggestion (who suggested, what cards, who responded, what was shown)
 
-Each player gets their own copy of visible history
+        Each player gets their own copy of visible history
 
-Card Likelihood Matrix
+___________________________________________________________________________________DONE____________________________________________________________
 
-For each player and each card, store a probability they have it:
+    Card Likelihood Matrix
 
-python
-Copy code
-belief[player_id][card] = float
-Update beliefs based on:
+        For each player and each card, store a probability they have it:
 
-Known hands
-
-Suggestions
-
-Responses (or lack thereof)
-
-Shown cards
-
-Elimination Inference
-
-If Player A suggests (Plum, Knife, Kitchen)
-
-Player B responds, but I already hold Knife and Kitchen → they must have Plum
+    Responses (or lack thereof)
 
 🎓 Phase 3: Bot Architecture
 🎯 Goal: Add logic-based and learning-based bots
 
-Rule-Based Bot
-
-Uses deduction to eliminate suspects
-
-Chooses suggestions to maximize new information
-
-Random Bot
-
-Selects suggestions randomly (good as baseline opponent)
-
+ 1) RandomBot - Accuse when no one shows
+ 2) RandomEliminationBot - Accuse when you can cross off through your suggestions
+ 3) Rule-based - Suggest based on a belief matrix, tracking cards shown indirectly, setting people that dont have certain cards to 0, and when a card is shown, which of the three guessed was i> probabilities 
+4) Guard-based - Compute importance values or privacy values for cards and show specific ones based on that, hide new inferences by not changing immediately
+5) Bluff-based - Throws off on purpose by bluffing own cards and tries to actively reinforce others' mistaken beliefs
+6) Watcher Bot - Makes inferences based on other's guesses, changes in patterns, insistence on certain cards, bluff detection 
+7) MirroBot - Mirrors others suggestions to confuse ever so often
+8) Policy switching bot 
 Learning Bot
 
 Wrap game logic in an RL-compatible interface:
@@ -113,9 +94,13 @@ Define Action Space
 
 Suggestions: all combinations of suspect/weapon/room
 
-Accusation (optional)
+Card Risk Levels - Sort cards by priority and reveal the ones that are less important or less visible
 
-Movement (if you later model the board)
+Opponent belief matrix - where do they think that card is
+
+Bluffing (guess own cards in suggestion)
+
+Information masking - dont make conclusions obvious (related to other's beliefs and suggestion log  )
 
 Define Reward Signal
 
@@ -140,15 +125,7 @@ Model Clue as a multi-agent extensive-form game
 
 Implement CFR on top of simulator
 
-Opponent Modeling
-
 Track tendencies: Do they bluff? Reuse same suggestions?
 
-Update beliefs about opponents' beliefs
 
-Deception/Bait Strategies
-
-Train bots to mislead others (suggest known cards)
-
-Detect such behavior in others
 

@@ -4,7 +4,7 @@ from ClueBasics import GameRules, Player
 if __name__ == "__main__":
     player_names = ["Alice", "Bob", "Charlie"]
     game = GameRules(players=[])
-    dummy_players = [Player(name, game, []) for name in player_names]
+    dummy_players = [Player(name, game) for name in player_names]
    
     
     # Now update references

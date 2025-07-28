@@ -55,15 +55,15 @@ class GameRules:
         if(i==len(self.players)):
                 i =0
         while(i!= playerPos):
-            print(self.players[i])
+            print(self.players[i], end = " ")
+            print("is checking their hand")
             cardShown = self.players[i].hasACard(perp, weapon, room)
             if(cardShown!=None):
                 return self.players[i], cardShown 
             else:
                 i+=1
             if(i==len(self.players)):
-                i=0    
-            time.sleep(1)   
+                i=0      
         return None, None
     
     def dealCards(self):
@@ -99,8 +99,6 @@ class GameRules:
             for player in self.players:
                 winner = player.playTurn()
                 if(winner):
-                    print(f"{player.name} is the winner!")
-                    print(player.ownersAndCards)
                     return
                 
                     

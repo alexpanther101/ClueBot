@@ -18,7 +18,7 @@ class Player(ABC):
         self.numCards = 0
         
     def __str__(self):
-        return f"Player: {self.name}"
+        return f"{self.name}"
     
     def __repr__(self):
         return str(self)
@@ -69,10 +69,6 @@ class Player(ABC):
             else:
                 self.possibleRooms.remove(card)
         
-            self.ownersAndCards[owner][card] = 1
-        
-            for op in self.opponents:
-                self.ownersAndCards[op][card] = 0    
         
     #Removes single card from possible solutions and maps to owner    
     def crossOff(self, owner, card):
@@ -85,10 +81,6 @@ class Player(ABC):
         else: 
                 self.possibleRooms.remove(card)
         
-        for op in self.opponents:
-            self.ownersAndCards[op][card] = 0
-        
-        self.ownersAndCards[owner][card] = 1
         
     #Checks if a player has a card and returns it
     def hasACard(self, perp, weapon, room):

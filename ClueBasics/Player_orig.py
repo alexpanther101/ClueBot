@@ -6,7 +6,6 @@ from abc import ABC, abstractmethod
 # Player is an abstract class that bots inherit from
 class Player(ABC):
     
-    #Set up methods
     def __init__(self, name, game):
         self.name = name
         self.game = game
@@ -47,16 +46,7 @@ class Player(ABC):
                 #need to update that probability when cards start to fill up
         
         self.ownersAndCards[self] = {}
-        
-    #Deals a card to self    
-    def isDealt(self, card):
-        self.cards.append(card)
-        self.crossOff(self, card)
-        self.numCards+=1
     
-#---------------------------------------------------------------------------------------------
-# Helper methods
-
     #Removes cards from possible solutions and maps to owner
     def crossOffMulti(self, owner, cardList):
         for card in cardList:
@@ -74,7 +64,7 @@ class Player(ABC):
             for op in self.opponents:
                 self.ownersAndCards[op][card] = 0    
         
-    #Removes single card from possible solutions and maps to owner    
+        
     def crossOff(self, owner, card):
         if(card.getType() == 'Suspect'):
                 self.possibleSuspects.remove(card)
@@ -90,36 +80,69 @@ class Player(ABC):
         
         self.ownersAndCards[owner][card] = 1
         
-    #Checks if a player has a card and returns it
-    def hasACard(self, perp, weapon, room):
-        for card in self.cards:
-            if card == perp or card == weapon or card == room:
-                return card
-        return None
-    
-    def getNumCards(self):
-        return self.numCards
-#--------------------------------------------------------------------------------------------
-# Player mechanics        
- 
+        
+        
+    #Possible moves and helpers    
     def makeAccusation(self, perp, weapon, room):
         return self.game.makeAccusation(self, perp, weapon, room)
     
     @abstractmethod 
     def chooseSuggestion(self):
-        """Must be implemented by child class"""
-        pass
+        suspect = random.choice(self.possibleSuspects)
+        weapon = random.choice(self.possibleWeapons)
+        room = random.choice(self.possibleRooms)
+        return suspect, weapon, room
     
-    
+       
     def makeSuggestion(self, perp, weapon, room):
         
         owner, card = self.game.makeSuggestion(self, perp, weapon, room)
         
-        return owner, card
+        if(owner!=None):
+            if(len(self.ownersAndCards[owner])<owner.getNumCards()):
+                self.crossOff(owner, card)
+
+            else:
+                print(owner+ "seems to already have "+ len(self.ownersAndCards[owner]) + "cards. There was a mistake in tracking cards")
     
-    
+    def isDealt(self, card):
+        self.cards.append(card)
+        self.crossOff(self, card)
+        self.numCards+=1
+        
+    def hasACard(self, perp, weapon, room):
+        for card in self.cards:
+            if card == perp or card == weapon or card == room:
+                return card
+        return None
+
     #playTurn method
     @abstractmethod
     def playTurn(self):
-        """Must be implemented by child class"""
-        pass
+        if not self.inGame:
+            return
+    
+        # For demo purposes, randomly suggest or accuse
+        # You can replace this with smarter logic later
+        
+
+        perp, weapon, room = self.chooseSuggestion()
+        owner, card = self.game.makeSuggestion(self, perp, weapon, room)
+
+        if owner is None:
+            print(f"No one disproved. {self.name} might try an accusation!")
+            if self.makeAccusation(perp, weapon, room):
+                return self.name
+            else:
+                print(f"{self.name} made a wrong accusation and is out.")
+                self.inGame = False
+        else:
+            print(f"{owner.name} showed a card.")
+            self.crossOff(owner, card)
+
+        if len(self.possibleSuspects) == 1 and len(self.possibleRooms) == 1 and len(self.possibleWeapons) == 1:
+            if self.makeAccusation(self.possibleSuspects[0], self.possibleWeapons[0], self.possibleRooms[0]):
+                print(f"{self.name} WINS! The solution was correct.")
+                exit(0)
+            else:
+                print(f"{self.name} made a wrong accusation and is out.")

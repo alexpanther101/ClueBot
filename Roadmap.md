@@ -38,7 +38,7 @@ Phase 1: Core Game Simulation
 🔍 Phase 2: Information Tracking & Belief Modeling
 🎯 Goal: Give bots memory and reasoning capabilities
 
-2. Suggestion History
+2. History
 
         Log every suggestion (who suggested, what cards, who responded, what was shown)
 
@@ -55,9 +55,9 @@ ________________________________________________________________________________
 🎓 Phase 3: Bot Architecture
 🎯 Goal: Add logic-based and learning-based bots
 
- 1) RandomBot - Accuse when no one shows
- 2) RandomEliminationBot - Accuse when you can cross off through your suggestions
- 3) Rule-based - Suggest based on a belief matrix, tracking cards shown indirectly, setting people that dont have certain cards to 0, and when a card is shown, which of the three guessed was i> probabilities 
+ 1) TriggerHappyBot - Accuse when no one shows
+ 2) EliminationBot - Accuse when its can cross off through its suggestions
+ 3) HeuristicsBot - Suggest based on a belief matrix, tracking cards shown indirectly, setting people that dont have certain cards to 0, and when a card is shown, which of the three guessed was i> probabilities 
 4) Guard-based - Compute importance values or privacy values for cards and show specific ones based on that, hide new inferences by not changing immediately
 5) Bluff-based - Throws off on purpose by bluffing own cards and tries to actively reinforce others' mistaken beliefs
 6) Watcher Bot - Makes inferences based on other's guesses, changes in patterns, insistence on certain cards, bluff detection 

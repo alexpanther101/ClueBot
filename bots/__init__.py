@@ -1,0 +1,1 @@
+from .TriggerHappyBot import TriggerHappyBot

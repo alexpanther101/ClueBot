@@ -1,10 +1,11 @@
 # main.py
 from ClueBasics import GameRules, Player
+from bots import TriggerHappyBot
 #testing commitsß
 if __name__ == "__main__":
     player_names = ["Alice", "Bob", "Charlie"]
     game = GameRules(players=[])
-    dummy_players = [Player(name, game) for name in player_names]
+    dummy_players = [TriggerHappyBot(name, game) for name in player_names]
    
     
     # Now update references

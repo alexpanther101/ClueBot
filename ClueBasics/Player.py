@@ -37,13 +37,13 @@ class Player(ABC):
         
         
             for card in self.possibleSuspects:
-                self.ownersAndCards[opponent][card] = 1/cardMatrixLen
+                self.ownersAndCards[opponent][card] = 1/len(opponents)
             
             for card in self.possibleWeapons:
-                self.ownersAndCards[opponent][card] = 1/cardMatrixLen
+                self.ownersAndCards[opponent][card] = 1/len(opponents)
                 
             for card in self.possibleRooms:
-                self.ownersAndCards[opponent][card] = 1/cardMatrixLen
+                self.ownersAndCards[opponent][card] = 1/len(opponents)
                 #need to update that probability when cards start to fill up
         
         self.ownersAndCards[self] = {}
@@ -80,7 +80,7 @@ class Player(ABC):
                 
         else: 
                 self.possibleRooms.remove(card)
-        
+     
         
     #Checks if a player has a card and returns it
     def hasACard(self, perp, weapon, room):
@@ -93,7 +93,11 @@ class Player(ABC):
         return self.numCards
 #--------------------------------------------------------------------------------------------
 # Player mechanics        
- 
+    
+    def updateBeliefs(self):
+        """Optional: Override in smarter bots to update probability matrix"""
+        pass
+    
     def makeAccusation(self, perp, weapon, room):
         return self.game.makeAccusation(self, perp, weapon, room)
     

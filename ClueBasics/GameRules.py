@@ -2,6 +2,7 @@ import time
 import random
 from .Card import Card
 class GameRules:
+    totalCards = 21
     ROOMS = ["Study", "Hall", "Lounge", "Library", "Billiard Room", "Dining Room", "Conservatory", "Ballroom", "Kitchen"]
     SUSPECTS = ["Colonel Mustard", "Reverend Green", "Miss Scarlet", "Mrs. Peacock", "Mrs White", "Professor Plum" ]
     WEAPONS = ["Knife", "Candlestick", "Rope", "Revolver", "Wrench", "Lead Pipe"]
@@ -82,9 +83,10 @@ class GameRules:
             playerIter+=1
             if(playerIter==len(self.players)):
                 playerIter = 0
-        
+                
         for player in self.players:
             print(player.name + " has " + str(player.numCards)+" cards")
+            player.initialCrossOff()
             if player.type == "Human":
                     player.revealCards()
                        

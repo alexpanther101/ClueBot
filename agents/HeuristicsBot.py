@@ -15,6 +15,11 @@ class HeuristicsBot(Player):
         
         return max(category, key=entropy)
     
+    def initialCrossOff(self):
+        self.createBeliefMatrix()
+        for card in self.cards:
+            self.crossOff(self, card)
+    
     def crossOff(self, owner, card):
         if(card.getType() == 'Suspect'):
                 self.possibleSuspects.remove(card)
@@ -25,7 +30,7 @@ class HeuristicsBot(Player):
         else: 
                 self.possibleRooms.remove(card)
         
-        for op in self.opponents:
+        for op in self.owners:
             self.ownersAndCards[op][card] = 0
         
         self.ownersAndCards[owner][card] = 1

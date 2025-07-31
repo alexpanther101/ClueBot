@@ -17,6 +17,7 @@ class Player(ABC):
         self.cards = []
         self.numCards = 0
         self.type = type
+        # self.owners = []
         
     def __str__(self):
         return f"{self.name}"
@@ -30,24 +31,32 @@ class Player(ABC):
     def setOpponents(self, opponents):
         self.opponents = opponents
         self.ownersAndCards = dict.fromkeys(opponents)
-        cardMatrixLen = len(self.possibleRooms)+len(self.possibleSuspects)+len(self.possibleWeapons)
         
+    
+    def createBeliefMatrix(self):
+        self.players = self.opponents + [self]
+        self.owners = self.opponents + [self] + ["Solution"]
         #Create belief matrix for each opponent - mapping each owner's card to a belief 
-        for opponent in self.opponents: 
-            self.ownersAndCards[opponent] = {}    
+        for player in self.players: 
+            self.ownersAndCards[player] = {}    
         
         
             for card in self.possibleSuspects:
-                self.ownersAndCards[opponent][card] = 1/len(opponents)
+                self.ownersAndCards[player][card] = player.getNumCards()/self.game.totalCards
             
             for card in self.possibleWeapons:
-                self.ownersAndCards[opponent][card] = 1/len(opponents)
+                self.ownersAndCards[player][card] = player.getNumCards()/self.game.totalCards
                 
             for card in self.possibleRooms:
-                self.ownersAndCards[opponent][card] = 1/len(opponents)
+                self.ownersAndCards[player][card] = player.getNumCards()/self.game.totalCards
                 #need to update that probability when cards start to fill up
-        
-        self.ownersAndCards[self] = {}
+
+        for card in self.possibleSuspects:
+            self.ownersAndCards["Solution"][card] = 3/self.game.totalCards
+        for card in self.possibleWeapons:
+            self.ownersAndCards["Solution"][card] = 3/self.game.totalCards
+        for card in self.possibleRooms:
+            self.ownersAndCards["Solution"][card] = 3/self.game.totalCards
         
     #Deals a card to self    
     def isDealt(self, card):
@@ -97,6 +106,10 @@ class Player(ABC):
     
     def getNumCards(self):
         return self.numCards
+    
+    def initialCrossOff(self):
+        self.createBeliefMatrix()
+        
 #--------------------------------------------------------------------------------------------
 # Player mechanics        
     def chooseCard(self):

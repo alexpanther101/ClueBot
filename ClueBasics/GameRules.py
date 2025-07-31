@@ -48,22 +48,29 @@ class GameRules:
         return False
     
     def makeSuggestion(self, player, perp, weapon, room):
-        print(f"{player.name} suggests: {perp}, {weapon}, in {room}")
+        print(f"{player.name} suggests: {perp} with {weapon} in {room}")
         self.suggestionLog.append(player.name + " " + perp.name + " " + weapon.name + " " + room.name)
+        
+        suggestionCards = []
+        suggestionCards.append(perp)
+        suggestionCards.append(weapon)
+        suggestionCards.append(room)
+         
         playerPos = self.players.index(player) 
         i = playerPos +1
         if(i==len(self.players)):
                 i =0
         while(i!= playerPos):
-            print(self.players[i])
-            cardShown = self.players[i].hasACard(perp, weapon, room)
+            print(self.players[i], end = " ")
+            print("is checking their hand")
+            
+            cardShown = self.players[i].refuteSuggestion(suggestionCards)
             if(cardShown!=None):
                 return self.players[i], cardShown 
             else:
                 i+=1
             if(i==len(self.players)):
-                i=0    
-            time.sleep(1)   
+                i=0      
         return None, None
     
     def dealCards(self):
@@ -75,6 +82,11 @@ class GameRules:
             playerIter+=1
             if(playerIter==len(self.players)):
                 playerIter = 0
+        
+        for player in self.players:
+            print(player.name + " has " + str(player.numCards)+" cards")
+            if player.type == "Human":
+                    player.revealCards()
                        
     def checkAllPlayers(self):
         count =0
@@ -99,7 +111,6 @@ class GameRules:
             for player in self.players:
                 winner = player.playTurn()
                 if(winner):
-                    print(f"{player.name} is the winner!")
                     return
                 
                     

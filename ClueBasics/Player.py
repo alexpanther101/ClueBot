@@ -1,9 +1,13 @@
 from .GameRules import GameRules
 import random
 from .Card import Card
-class Player:
+from abc import ABC, abstractmethod
+
+# Player is an abstract class that bots inherit from
+class Player(ABC):
     
-    def __init__(self, name, game, opponents):
+    #Set up methods
+    def __init__(self, name, game, type):
         self.name = name
         self.game = game
         self.possibleSuspects = list(game.suspectCards.values())
@@ -12,9 +16,10 @@ class Player:
         self.inGame = True
         self.cards = []
         self.numCards = 0
+        self.type = type
         
     def __str__(self):
-        return f"Player: {self.name}"
+        return f"{self.name}"
     
     def __repr__(self):
         return str(self)
@@ -25,11 +30,34 @@ class Player:
     def setOpponents(self, opponents):
         self.opponents = opponents
         self.ownersAndCards = dict.fromkeys(opponents)
-        for opponent in self.opponents: 
-            self.ownersAndCards[opponent] = []
-        self.ownersAndCards[self] = []   
+        cardMatrixLen = len(self.possibleRooms)+len(self.possibleSuspects)+len(self.possibleWeapons)
         
+        #Create belief matrix for each opponent - mapping each owner's card to a belief 
+        for opponent in self.opponents: 
+            self.ownersAndCards[opponent] = {}    
+        
+        
+            for card in self.possibleSuspects:
+                self.ownersAndCards[opponent][card] = 1/len(opponents)
+            
+            for card in self.possibleWeapons:
+                self.ownersAndCards[opponent][card] = 1/len(opponents)
+                
+            for card in self.possibleRooms:
+                self.ownersAndCards[opponent][card] = 1/len(opponents)
+                #need to update that probability when cards start to fill up
+        
+        self.ownersAndCards[self] = {}
+        
+    #Deals a card to self    
+    def isDealt(self, card):
+        self.cards.append(card)
+        self.crossOff(self, card)
+        self.numCards+=1
     
+#---------------------------------------------------------------------------------------------
+# Helper methods
+
     #Removes cards from possible solutions and maps to owner
     def crossOffMulti(self, owner, cardList):
         for card in cardList:
@@ -42,8 +70,13 @@ class Player:
             else:
                 self.possibleRooms.remove(card)
         
-        self.ownersAndCards[owner].append(card)
-        
+    
+    def revealCards(self):
+        print(self.name + "has cards: ")
+        for i, card in enumerate(self.cards):
+            print(f"{i + 1}. {card.name}")
+            
+    #Removes single card from possible solutions and maps to owner    
     def crossOff(self, owner, card):
         if(card.getType() == 'Suspect'):
                 self.possibleSuspects.remove(card)
@@ -53,68 +86,51 @@ class Player:
                 
         else: 
                 self.possibleRooms.remove(card)
+     
         
-        self.ownersAndCards[owner].append(card)
-        
-    #Possible moves and helpers    
-        
-    def makeAccusation(self, perp, weapon, room):
-        return self.game.makeAccusation(self, perp, weapon, room)
-    
-    def chooseSuggestion(self):
-        suspect = random.choice(self.possibleSuspects)
-        weapon = random.choice(self.possibleWeapons)
-        room = random.choice(self.possibleRooms)
-        return suspect, weapon, room
-        
-    def makeSuggestion(self, perp, weapon, room):
-        
-        owner, card = self.game.makeSuggestion(self, perp, weapon, room)
-        
-        if(owner!=None):
-            if(len(self.ownersAndCards[owner])<owner.getNumCards()):
-                self.crossOff(owner, card)
-
-            else:
-                print(owner+ "seems to already have "+ len(self.ownersAndCards[owner]) + "cards. There was a mistake in tracking cards")
-    
-    def isDealt(self, card):
-        self.cards.append(card)
-        self.crossOff(self, card)
-        self.numCards+=1
-        
+    #Checks if a player has a card and returns it
     def hasACard(self, perp, weapon, room):
         for card in self.cards:
             if card == perp or card == weapon or card == room:
                 return card
         return None
-
-    #playTurn method
-    def playTurn(self):
-        if not self.inGame:
-            return
     
-        # For demo purposes, randomly suggest or accuse
-        # You can replace this with smarter logic later
+    def getNumCards(self):
+        return self.numCards
+#--------------------------------------------------------------------------------------------
+# Player mechanics        
+    def chooseCard(self):
+        pass
+    
+    def updateBeliefs(self):
+        """Optional: Override in smarter bots to update probability matrix"""
+        pass
+    
+    def makeAccusation(self, perp, weapon, room):
+        return self.game.makeAccusation(self, perp, weapon, room)
+    
+    @abstractmethod 
+    def chooseSuggestion(self):
+        """Must be implemented by child class"""
+        pass
+    
+    def showCard(self, matching_cards):
+        return random.choice(matching_cards)
         
-
-        perp, weapon, room = self.chooseSuggestion()
+    def refuteSuggestion(self, suggestionCards):
+        matching_cards = [card for card in self.cards if card in suggestionCards]
+        if not matching_cards:
+            return None
+        chosen = self.showCard(matching_cards)
+        return chosen
+        
+    def makeSuggestion(self, perp, weapon, room):
         owner, card = self.game.makeSuggestion(self, perp, weapon, room)
-
-        if owner is None:
-            print(f"No one disproved. {self.name} might try an accusation!")
-            if self.makeAccusation(perp, weapon, room):
-                return self.name
-            else:
-                print(f"{self.name} made a wrong accusation and is out.")
-                self.inGame = False
-        else:
-            print(f"{owner.name} showed a card.")
-            self.crossOff(owner, card)
-
-        if len(self.possibleSuspects) == 1 and len(self.possibleRooms) == 1 and len(self.possibleWeapons) == 1:
-            if self.makeAccusation(self.possibleSuspects[0], self.possibleWeapons[0], self.possibleRooms[0]):
-                print(f"{self.name} WINS! The solution was correct.")
-                exit(0)
-            else:
-                print(f"{self.name} made a wrong accusation and is out.")
+        return owner, card
+    
+    
+    #playTurn method
+    @abstractmethod
+    def playTurn(self):
+        """Must be implemented by child class"""
+        pass

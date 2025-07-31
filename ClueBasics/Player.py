@@ -7,7 +7,7 @@ from abc import ABC, abstractmethod
 class Player(ABC):
     
     #Set up methods
-    def __init__(self, name, game):
+    def __init__(self, name, game, type):
         self.name = name
         self.game = game
         self.possibleSuspects = list(game.suspectCards.values())
@@ -16,6 +16,7 @@ class Player(ABC):
         self.inGame = True
         self.cards = []
         self.numCards = 0
+        self.type = type
         
     def __str__(self):
         return f"{self.name}"
@@ -69,7 +70,12 @@ class Player(ABC):
             else:
                 self.possibleRooms.remove(card)
         
-        
+    
+    def revealCards(self):
+        print(self.name + "has cards: ")
+        for i, card in enumerate(self.cards):
+            print(f"{i + 1}. {card.name}")
+            
     #Removes single card from possible solutions and maps to owner    
     def crossOff(self, owner, card):
         if(card.getType() == 'Suspect'):
@@ -93,6 +99,8 @@ class Player(ABC):
         return self.numCards
 #--------------------------------------------------------------------------------------------
 # Player mechanics        
+    def chooseCard(self):
+        pass
     
     def updateBeliefs(self):
         """Optional: Override in smarter bots to update probability matrix"""
@@ -106,11 +114,18 @@ class Player(ABC):
         """Must be implemented by child class"""
         pass
     
-    
+    def showCard(self, matching_cards):
+        return random.choice(matching_cards)
+        
+    def refuteSuggestion(self, suggestionCards):
+        matching_cards = [card for card in self.cards if card in suggestionCards]
+        if not matching_cards:
+            return None
+        chosen = self.showCard(matching_cards)
+        return chosen
+        
     def makeSuggestion(self, perp, weapon, room):
-        
         owner, card = self.game.makeSuggestion(self, perp, weapon, room)
-        
         return owner, card
     
     

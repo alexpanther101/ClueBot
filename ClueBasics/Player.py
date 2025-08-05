@@ -17,6 +17,7 @@ class Player(ABC):
         self.cards = []
         self.numCards = 0
         self.type = type
+        self.suggestionLog = []
         # self.owners = []
         
     def __str__(self):
@@ -32,31 +33,36 @@ class Player(ABC):
         self.opponents = opponents
         self.ownersAndCards = dict.fromkeys(opponents)
         
+    def getProbability(self, owner, card):
+        frac = self.ownersAndCards[owner][card]
+        return frac[0] / frac[1] if frac[1] != 0 else 0.0
+    
+    def setProbability(self, owner, card, numerator, denominator=1):
+        self.ownersAndCards[owner][card] = [numerator, denominator]
     
     def createBeliefMatrix(self):
         self.players = self.opponents + [self]
         self.owners = self.opponents + [self] + ["Solution"]
+        total_cards = self.game.totalCards
         #Create belief matrix for each opponent - mapping each owner's card to a belief 
+        for owner in self.owners:
+            self.ownersAndCards[owner] = {}
+        
         for player in self.players: 
-            self.ownersAndCards[player] = {}    
-        
-        
-            for card in self.possibleSuspects:
-                self.ownersAndCards[player][card] = player.getNumCards()/self.game.totalCards
-            
-            for card in self.possibleWeapons:
-                self.ownersAndCards[player][card] = player.getNumCards()/self.game.totalCards
-                
-            for card in self.possibleRooms:
-                self.ownersAndCards[player][card] = player.getNumCards()/self.game.totalCards
-                #need to update that probability when cards start to fill up
+            num_cards = player.getNumCards()
+            for card in self.possibleSuspects + self.possibleWeapons + self.possibleRooms:
+                self.ownersAndCards[player][card] = [num_cards, total_cards]
 
         for card in self.possibleSuspects:
-            self.ownersAndCards["Solution"][card] = 3/self.game.totalCards
+            self.ownersAndCards["Solution"][card] = [1, len(self.game.SUSPECTS)]
+         
         for card in self.possibleWeapons:
-            self.ownersAndCards["Solution"][card] = 3/self.game.totalCards
+            self.ownersAndCards["Solution"][card] = [1, len(self.game.WEAPONS)]
+            
         for card in self.possibleRooms:
-            self.ownersAndCards["Solution"][card] = 3/self.game.totalCards
+            self.ownersAndCards["Solution"][card] = [1, len(self.game.ROOMS)]   
+            
+            
         
     #Deals a card to self    
     def isDealt(self, card):
@@ -88,12 +94,15 @@ class Player(ABC):
     #Removes single card from possible solutions and maps to owner    
     def crossOff(self, owner, card):
         if(card.getType() == 'Suspect'):
+            if card in self.possibleSuspects:
                 self.possibleSuspects.remove(card)
                 
         elif (card.getType() == 'Weapon'):
+            if card in self.possibleWeapons:
                 self.possibleWeapons.remove(card)
                 
         else: 
+            if card in self.possibleRooms:
                 self.possibleRooms.remove(card)
      
         

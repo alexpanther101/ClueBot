@@ -15,6 +15,7 @@ class GameRules:
         self.roomCards = {}
         self.deck = {}
         self.suggestionLog = []
+        self.turn=0
         for card in self.SUSPECTS:
             suspect = Card("Suspect", card)
             self.suspectCards[card] = suspect
@@ -50,29 +51,57 @@ class GameRules:
     
     def makeSuggestion(self, player, perp, weapon, room):
         print(f"{player.name} suggests: {perp} with {weapon} in {room}")
-        self.suggestionLog.append(player.name + " " + perp.name + " " + weapon.name + " " + room.name)
         
-        suggestionCards = []
-        suggestionCards.append(perp)
-        suggestionCards.append(weapon)
-        suggestionCards.append(room)
-         
+        suggestionCards = [perp, weapon, room]
         playerPos = self.players.index(player) 
-        i = playerPos +1
-        if(i==len(self.players)):
-                i =0
+        i = (playerPos +1) % len(self.players)
+        
+        suggestion_record = {
+        "turn": self.turn,  # or a turn counter if you have one
+        "suggester": player,
+        "suggestion": suggestionCards,
+        "ambiguous": True,
+        "responder": None,
+        "card_shown": None,
+        "possible_shown_cards": set(suggestionCards),
+        "skipped_players" : []
+        }
+        
         while(i!= playerPos):
             print(self.players[i], end = " ")
             print("is checking their hand")
             
             cardShown = self.players[i].refuteSuggestion(suggestionCards)
+            
             if(cardShown!=None):
+                suggestion_record['responder'] = self.players[i]
+                self.suggestionLog.append(suggestion_record)
                 return self.players[i], cardShown 
-            else:
-                i+=1
-            if(i==len(self.players)):
-                i=0      
+            
+            suggestion_record['skipped_players'].append(self.players[i])
+            i = (i + 1) % len(self.players)     
+        
+        self.suggestionLog.append(suggestion_record)    
         return None, None
+    
+    def getPublicSuggestionLog(self, player):
+        public_log = []
+        for rec in self.suggestionLog:
+            entry ={
+                "turn": rec["turn"],
+                "suggester": rec["suggester"],
+                "suggestion": list(rec["suggestion"]),
+                "responder": rec["responder"] if rec["responder"] else None,
+                "card_shown": None,  # hide the card shown here
+                "ambiguous": rec["ambiguous"],
+                "skipped_players": rec.get("skipped_players")
+            }
+            if player == rec["suggester"] or player == rec["responder"]:
+                entry["card_shown"] = rec["card_shown"]
+                entry["ambiguous"] = False
+            public_log.append(entry)
+        return public_log
+
     
     def dealCards(self):
         deckCards = list(self.deck.keys())
@@ -107,6 +136,7 @@ class GameRules:
     def gameLoop(self):
         self.dealCards()
         while(True):
+            self.turn+=1
             if not (self.checkAllPlayers()):
                 break
             

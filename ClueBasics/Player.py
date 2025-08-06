@@ -17,8 +17,8 @@ class Player(ABC):
         self.cards = []
         self.numCards = 0
         self.type = type
-        self.suggestionLog = []
-        # self.owners = []
+        self.privateSuggestionLog = []
+        self.owners = []
         
     def __str__(self):
         return f"{self.name}"
@@ -31,14 +31,17 @@ class Player(ABC):
     
     def setOpponents(self, opponents):
         self.opponents = opponents
-        self.ownersAndCards = dict.fromkeys(opponents)
+        self.players = self.opponents + [self]
+        self.owners = self.opponents + [self] + ["Solution"]
+        self.ownersAndCards = {owner: {} for owner in self.owners}
+        
         
     def getProbability(self, owner, card):
-        frac = self.ownersAndCards[owner][card]
-        return frac[0] / frac[1] if frac[1] != 0 else 0.0
-    
-    def setProbability(self, owner, card, numerator, denominator=1):
-        self.ownersAndCards[owner][card] = [numerator, denominator]
+        return self.ownersAndCards[owner][card]
+        
+
+    def setProbability(self, owner, card, prob):
+        self.ownersAndCards[owner][card] = prob
     
     def createBeliefMatrix(self):
         self.players = self.opponents + [self]
@@ -50,17 +53,17 @@ class Player(ABC):
         
         for player in self.players: 
             num_cards = player.getNumCards()
-            for card in self.possibleSuspects + self.possibleWeapons + self.possibleRooms:
-                self.ownersAndCards[player][card] = [num_cards, total_cards]
+            for card in self.game.cards:
+                self.ownersAndCards[player][card] = num_cards/ total_cards
 
-        for card in self.possibleSuspects:
-            self.ownersAndCards["Solution"][card] = [1, len(self.game.SUSPECTS)]
+        for card in self.game.suspectCards.values():
+            self.ownersAndCards["Solution"][card] = 1/ len(self.game.SUSPECTS)
          
-        for card in self.possibleWeapons:
-            self.ownersAndCards["Solution"][card] = [1, len(self.game.WEAPONS)]
+        for card in self.game.weaponCards.values():
+            self.ownersAndCards["Solution"][card] = 1/ len(self.game.WEAPONS)
             
-        for card in self.possibleRooms:
-            self.ownersAndCards["Solution"][card] = [1, len(self.game.ROOMS)]   
+        for card in self.game.roomCards.values():
+            self.ownersAndCards["Solution"][card] = 1/ len(self.game.ROOMS)
             
             
         

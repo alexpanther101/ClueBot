@@ -14,21 +14,27 @@ class GameRules:
         self.weaponCards = {}
         self.roomCards = {}
         self.deck = {}
+        self.cards = []
         self.suggestionLog = []
         self.turn=0
+        self.gameTurn = 0
         for card in self.SUSPECTS:
             suspect = Card("Suspect", card)
             self.suspectCards[card] = suspect
             self.deck[card] = suspect
+            self.cards.append(suspect)
             
         for card in self.WEAPONS:
             weapon = Card("Weapon", card) 
             self.weaponCards[card] = (weapon)  
             self.deck[card] = weapon
+            self.cards.append(weapon)
+            
         for card in self.ROOMS:
             room = Card("Room", card)
             self.roomCards[card] = (room)
             self.deck[card] = room
+            self.cards.append(room)
                     
         self.solution = {
             "Suspect" : random.choice(list(self.suspectCards.values())),
@@ -45,7 +51,9 @@ class GameRules:
     def makeAccusation(self, player, perp, weapon, room):
         print((player.name) + " accuses " + perp.name + " with a " + weapon.name + " in the "+room.name)
         if(self.solution.get("Suspect") == perp and self.solution.get("Weapon") == weapon and self.solution.get("Room") == room):
+            print(f"{player.name} has won!")
             return True
+        print(f"{player.name} has accused wrong and is out")
         player.inGame = False
         return False
     
@@ -75,6 +83,7 @@ class GameRules:
             
             if(cardShown!=None):
                 suggestion_record['responder'] = self.players[i]
+                suggestion_record['card_shown'] = cardShown
                 self.suggestionLog.append(suggestion_record)
                 return self.players[i], cardShown 
             
@@ -136,15 +145,18 @@ class GameRules:
     def gameLoop(self):
         self.dealCards()
         while(True):
-            self.turn+=1
+            self.gameTurn+=1
+            print("Turn "+str(self.gameTurn))
             if not (self.checkAllPlayers()):
                 break
             
             for player in self.players:
                 winner = player.playTurn()
+                self.turn+=1
                 if(winner):
                     return
-                
+            
+            time.sleep(2)    
                     
     
     

@@ -3,7 +3,7 @@ import random
 import math
 from fractions import Fraction
 
-class HeuristicsBot(Player):
+class BayesianLearner(Player):
     
     def __init__(self, name, game, type):
         super().__init__(name, game, type)
@@ -178,8 +178,7 @@ class HeuristicsBot(Player):
                                 
                 self.normalizeCardAcrossPlayers(shown_card, self.owners)
 
-
-    def playTurn(self):
+    def playTurn(self, obs, valid_mask):
         if not self.inGame:
             return
         # print(self.possibleSuspects)

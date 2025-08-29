@@ -75,6 +75,18 @@ class Player(ABC):
     
 #---------------------------------------------------------------------------------------------
 # Helper methods
+    def getFlattenedBeliefs(self):
+        """
+        Returns a flat list representing the probability that each card
+        belongs to each possible owner (including the solution envelope).
+        Order: [card1_owner1, card1_owner2, ..., cardN_solution]
+        """
+        state = []
+        for card in self.game.cards:
+            for owner in self.owners:
+                prob = self.ownersAndCards[owner].get(card, 0.0)
+                state.append(prob)
+        return state
 
     #Removes cards from possible solutions and maps to owner
     def crossOffMulti(self, owner, cardList):
@@ -141,14 +153,23 @@ class Player(ABC):
     
     def showCard(self, matching_cards):
         return random.choice(matching_cards)
-        
+    
+    """deprecated -> use revealCard instead"""    
     def refuteSuggestion(self, suggestionCards):
         matching_cards = [card for card in self.cards if card in suggestionCards]
         if not matching_cards:
             return None
         chosen = self.showCard(matching_cards)
         return chosen
-        
+    
+    def revealCard(self, matching_cards):
+        """
+        Default behavior: pick the first card (or random) if multiple can be shown.
+        """
+        if not matching_cards:
+            return None
+        return random.choice(matching_cards)
+    
     def makeSuggestion(self, perp, weapon, room):
         owner, card = self.game.makeSuggestion(self, perp, weapon, room)
         return owner, card
@@ -156,6 +177,6 @@ class Player(ABC):
     
     #playTurn method
     @abstractmethod
-    def playTurn(self):
+    def playTurn(self, obs, valid_mask):
         """Must be implemented by child class"""
         pass

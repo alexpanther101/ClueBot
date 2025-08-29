@@ -9,7 +9,7 @@ class TriggerHappyBot(Player):
         room = random.choice(self.possibleRooms)
         return suspect, weapon, room
 
-    def playTurn(self):
+    def playTurn(self, obs, valid_mask):
         if not self.inGame:
             return
 

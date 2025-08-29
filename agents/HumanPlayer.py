@@ -49,7 +49,12 @@ class HumanPlayer(Player):
         chosen = self.chooseCard(matching_cards)
         return chosen
 
-    def playTurn(self):
+    def revealCard(self, matching_cards):
+        print("\nYou may choose one of your cards to show:")
+        chosen = self.chooseCard(matching_cards)
+        return chosen
+
+    def playTurn(self, obs, valid_mask):
         print(f"\n===== {self.name}'s Turn =====")
         print("Your cards:")
         for card in self.cards:

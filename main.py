@@ -1,6 +1,6 @@
 # main.py
 from ClueBasics import GameRules, Player
-from agents import TriggerHappyBot, EliminationBot, HumanPlayer, HeuristicsBot
+from agents import TriggerHappyBot, EliminationBot, HumanPlayer, BayesianLearner
 #testing commits
 if __name__ == "__main__":
     trigger_player_names = ["Trigger1"]
@@ -14,7 +14,7 @@ if __name__ == "__main__":
             dummy_players.append(EliminationBot(name, game, "bot"))
    
     for name in heuristic_names:
-        dummy_players.append(HeuristicsBot(name, game, "bot"))         
+        dummy_players.append(BayesianLearner(name, game, "bot"))         
     # Now update references
     for p in dummy_players:
             p.setOpponents([op for op in dummy_players if op != p])

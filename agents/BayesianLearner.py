@@ -2,6 +2,7 @@ from ClueBasics.Player import Player
 import random
 import math
 from fractions import Fraction
+import logging
 
 class BayesianLearner(Player):
     
@@ -164,6 +165,7 @@ class BayesianLearner(Player):
                 shown_card = possible_cards[0]
                 if not self.game.hasHuman:
                     print(f"Turn {int(turn/len(self.players))}: Deduced {responder} showed {shown_card}")
+                logging.info(f"Turn {int(turn/len(self.players))}: Deduced {responder} showed {shown_card}")
                 self.crossOff(responder, shown_card)  # sets to (1,1), zeros others
                 
                 rec["card_shown"] = shown_card  # Save for future use
@@ -183,10 +185,11 @@ class BayesianLearner(Player):
     def playTurn(self, obs, valid_mask):
         if not self.inGame:
             return
-        # print(self.possibleSuspects)
-        # print(self.possibleWeapons)
-        # print(self.possibleRooms)
-        # print(self.ownersAndCards)
+        logging.info(self.name+"'s possible suspects "+str(self.possibleSuspects))
+        logging.info(self.name+"'s possible weapons "+str(self.possibleWeapons))
+        logging.info(self.name+"'s possible rooms "+str(self.possibleRooms))
+        logging.info(self.name+"'s belief matrix "+str(self.ownersAndCards))
+        
         self.processNewSuggestions()
         perp, weapon, room = self.chooseSuggestion()
         responder, card = self.game.makeSuggestion(self, perp, weapon, room)
@@ -195,6 +198,7 @@ class BayesianLearner(Player):
             if not self.game.hasHuman:
                 print(f"{responder.name} showed a card - {card.name}.")
             else: print(f"{responder.name} showed a card")
+            logging.info(f"{responder.name} showed a card - {card.name}.")
             self.crossOff(responder, card)
             for owner in self.owners:
                         if not owner == responder:

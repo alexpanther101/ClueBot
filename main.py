@@ -1,7 +1,7 @@
 import sys
 import os
 import torch
-import random
+import logging
 import numpy as np
 
 # Add parent directory to path to find all modules
@@ -52,8 +52,9 @@ def run_game_loop(players_list,game, rl_agent=None):
     for player in players_list:
         player.initialCrossOff()
 
-    print("\nGame has started! Solution is hidden.")
-    print("------------------------------------------")
+    tempstr = "\nGame has started! Solution is hidden.\n ------------------------------------------"
+    logging.info(tempstr)
+    print(tempstr)
 
     winner = None
     turn_count = 0
@@ -61,6 +62,7 @@ def run_game_loop(players_list,game, rl_agent=None):
     while winner is None and turn_count < 200: # Add a turn limit to prevent infinite loops
         turn_count += 1
         print(f"\n--- Turn {turn_count} ---")
+        logging.info(f"\n--- Turn {turn_count} ---")
         
         current_player_idx = (game.turn) % len(players_list)
         current_player = players_list[current_player_idx]
@@ -71,6 +73,7 @@ def run_game_loop(players_list,game, rl_agent=None):
             continue
 
         print(f"It is {current_player.name}'s turn.")
+        logging.info(f"It is {current_player.name}'s turn.")
         
         # --- Handle different player types ---
         if current_player.type == "RL":
@@ -91,39 +94,47 @@ def run_game_loop(players_list,game, rl_agent=None):
     print("\n------------------------------------------")
     if winner:
         print(f"Game over! The winner is {winner}.")
+        logging.info(f"Game over! The winner is {winner}.")
         return winner
     else:
         print("Game over! No winner found within turn limit.")
         return None
 
 if __name__ == "__main__":
+    logging.basicConfig(
+    filename="game_logs/app.log",              # Log file name
+    filemode="a",                    # "w" = overwrite, "a" = append
+    level=logging.INFO,              # Minimum level to log
+    format="%(asctime)s - %(levelname)s - %(message)s"
+)
     # --- Configuration ---
     # Set the path to your trained RL model
-    MODEL_CHECKPOINT_PATH = "path/to/your/rl_model_checkpoint.pth" 
+    #MODEL_CHECKPOINT_PATH = "path/to/your/rl_model_checkpoint.pth" 
     
     # Make sure a checkpoint file exists before running
     # You will need to train your agent first to generate this file
-    if not os.path.exists(MODEL_CHECKPOINT_PATH):
-       print(f"Error: Model checkpoint not found at {MODEL_CHECKPOINT_PATH}")
-       print("Please train your RL agent first to create the checkpoint.")
-       sys.exit(1)
+    #if not os.path.exists(MODEL_CHECKPOINT_PATH):
+     #  print(f"Error: Model checkpoint not found at {MODEL_CHECKPOINT_PATH}")
+      # print("Please train your RL agent first to create the checkpoint.")
+       #sys.exit(1)
 
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    #device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     
     # --- Create players for the game ---
     # Instantiate the RL player
-    rl_player = RLPlayer("Cluebot_RL", None, "RL")
+    #rl_player = RLPlayer("Cluebot_RL", None, "RL")
     
     # Load the trained model into the RL player
-    trained_agent = load_rl_agent(MODEL_CHECKPOINT_PATH, None, device) # Pass None for game rules, since the agent doesn't need it for loading
-    rl_player.agent = trained_agent
+    #trained_agent = load_rl_agent(MODEL_CHECKPOINT_PATH, None, device) # Pass None for game rules, since the agent doesn't need it for loading
+    #rl_player.agent = trained_agent
     game = GameRules(players=[])
     # Instantiate other bots to play against the RL agent
     players = [
         #rl_player,
         BayesianLearner("Bayesian_A", game, "Bayesian"),
-        BayesianLearner("Bayesian_B", game, "Bayesian"), 
-        EliminationBot("ElimA", game, "Elimination")
+        TriggerHappyBot("Trig1", game, "Trigger"), 
+        EliminationBot("ElimA", game, "Elimination"), 
+        #HumanPlayer("Sharanya", game, "Human")
     ]
     # --- Run the game ---
     run_game_loop(players, game)

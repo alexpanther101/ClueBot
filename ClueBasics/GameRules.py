@@ -2,6 +2,7 @@ import time
 import random
 from .Card import Card
 from collections import deque
+import logging 
 
 class GameRules:
     """Class to run and manage the main game loop and the game mechanisms"""
@@ -122,6 +123,7 @@ class GameRules:
         while(i!= playerPos):
             print(self.players[i], end = " ")
             print("is checking their hand")
+            logging.info(self.players[i].name + " is checking their hand")
             
             matching_cards = [c for c in suggestionCards if self.players[i].hasCard(c)]
             if matching_cards:
@@ -199,7 +201,7 @@ class GameRules:
         self.deck.pop((self.solution.get("Weapon")).getName())
         self.deck.pop((self.solution.get("Room")).getName())
         
-        #print("Solution cards are "+(self.solution.get("Suspect")).getName()+ ", "+self.solution.get("Weapon").getName()+", "+self.solution.get("Room").getName())
+        logging.info("Solution cards are "+(self.solution.get("Suspect")).getName()+ ", "+self.solution.get("Weapon").getName()+", "+self.solution.get("Room").getName())
         
         deckCards = list(self.deck.keys())
         random.shuffle(deckCards)
@@ -212,6 +214,7 @@ class GameRules:
                 
         for player in self.players:
             print(player.name + " has " + str(player.numCards)+" cards")
+            logging.info(player.name + " has " + str(player.numCards)+" cards")
             player.initialCrossOff()
             if player.type == "Human":
                     player.revealCards()

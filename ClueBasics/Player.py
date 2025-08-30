@@ -102,7 +102,7 @@ class Player(ABC):
         
     
     def revealCards(self):
-        print(self.name + "has cards: ")
+        print(self.name + " has cards: ")
         for i, card in enumerate(self.cards):
             print(f"{i + 1}. {card.name}")
             
@@ -128,6 +128,11 @@ class Player(ABC):
                 return card
         return None
     
+    def hasCard(self, card):
+        if(card in self.cards):
+            return True
+        else: return False
+        
     def getNumCards(self):
         return self.numCards
     

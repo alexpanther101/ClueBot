@@ -5,6 +5,9 @@ import torch.optim as optim
 import torch.nn.functional as F
 import numpy as np
 import copy
+from rl.utils import sizes_from_game
+from ClueBasics.GameRules import GameRules
+import random
 
 class DQN(nn.Module):
     def __init__(self, input_dim, output_dim, hidden_dims=(256, 256)):
@@ -22,66 +25,79 @@ class DQN(nn.Module):
         return self.net(x)  # Q-values for all actions
     
 class DQNAgent:
-    def __init__(self, input_dim, output_dim, lr=1e-4, gamma=0.99, device=None):
+    def __init__(self, game_rules, input_dim, lr=1e-4, gamma=0.99, device=None):
+        self.game_rules = game_rules
         self.input_dim = input_dim
-        self.output_dim = output_dim
         self.gamma = gamma
         self.device = device or torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-        self.q_net = DQN(input_dim, output_dim).to(self.device)
-        self.target_net = copy.deepcopy(self.q_net).to(self.device)
-        self.optimizer = optim.Adam(self.q_net.parameters(), lr=lr)
-        self.loss_fn = nn.SmoothL1Loss()  # Huber loss
-        self.target_net.eval()  # Target net in eval mode
+        # --- REVISED: Dynamically calculate the output dimension of the network ---
+        S, W, R, C, _ = sizes_from_game(self.game_rules)
+        self.output_dim = (S * W * R) * 2 + C
+        # 2x because of suggestions + accusations
+        
+        self.q_net = DQN(input_dim, self.output_dim).to(self.device)
+        self.target_net = copy.deepcopy(self.q_net)
+        self.target_net.eval() # Set target network to evaluation mode
 
+        self.optimizer = optim.Adam(self.q_net.parameters(), lr=lr)
+        self.loss_fn = nn.SmoothL1Loss() # Huber loss
+    
     def select_action(self, obs, valid_mask, epsilon):
         """
-        obs: np.array (input_dim,)
-        valid_mask: np.array (output_dim,) of bools
-        epsilon: float, exploration rate
+        Selects an action using an epsilon-greedy policy.
+        A valid mask is applied to prevent selecting illegal moves.
         """
-        if np.random.rand() < epsilon:
-            # Random valid action
-            valid_indices = np.nonzero(valid_mask)[0]
-            return np.random.choice(valid_indices)
+        if random.random() < epsilon:
+            # Exploration: pick a random valid action
+            valid_action_indices = np.where(valid_mask)[0]
+            if len(valid_action_indices) > 0:
+                return np.random.choice(valid_action_indices)
+            else:
+                # Fallback if no valid actions (should not happen in a well-defined game)
+                return -1
+        else:
+            # Exploitation: pick the best action according to Q-network
+            obs_t = torch.tensor(obs, dtype=torch.float32, device=self.device).unsqueeze(0)
+            with torch.no_grad():
+                q_values = self.q_net(obs_t).cpu().numpy().squeeze()
 
-        obs_t = torch.tensor(obs, dtype=torch.float32, device=self.device).unsqueeze(0)
-        with torch.no_grad():
-            q_values = self.q_net(obs_t).cpu().numpy().squeeze()
-
-        # Mask invalid actions by setting them to -inf
-        q_values[~valid_mask] = -np.inf
-        return int(np.argmax(q_values))
+            # Mask invalid actions by setting them to -inf
+            q_values[~valid_mask] = -np.inf
+            
+            # The agent may not have enough information to choose an action
+            if np.all(q_values == -np.inf):
+                return -1 # Fallback
+                
+            return int(np.argmax(q_values))
 
     def update_target_network(self):
+        """Copies the Q-network weights to the target network."""
         self.target_net.load_state_dict(self.q_net.state_dict())
 
     def learn(self, batch):
-        """
-        batch: dict with keys 'obs', 'actions', 'rewards', 'next_obs', 'dones'
-        Each value is a tensor already on the correct device.
-        """
-        obs = batch['obs']
-        actions = batch['actions']
-        rewards = batch['rewards']
-        next_obs = batch['next_obs']
-        dones = batch['dones']
-
-        # Q(s,a)
+        """Performs a single learning step on the Q-network."""
+        # Convert batch to tensors
+        obs = torch.tensor(np.array(batch.state), dtype=torch.float32, device=self.device)
+        actions = torch.tensor(batch.action, dtype=torch.long, device=self.device)
+        rewards = torch.tensor(batch.reward, dtype=torch.float32, device=self.device)
+        next_obs = torch.tensor(np.array(batch.next_state), dtype=torch.float32, device=self.device)
+        dones = torch.tensor(batch.done, dtype=torch.bool, device=self.device)
+        masks = torch.tensor(np.array(batch.mask), dtype=torch.bool, device=self.device)
+        
+        # Rest of learning logic...
         q_values = self.q_net(obs)
-        state_action_values = q_values.gather(1, actions.long().unsqueeze(1)).squeeze(1)
+        state_action_values = q_values.gather(1, actions.unsqueeze(1)).squeeze(1)
 
-        # max_a' Q_target(s',a')
         with torch.no_grad():
             next_q_values = self.target_net(next_obs)
-            max_next_q_values, _ = next_q_values.max(dim=1)
-            target_values = rewards + self.gamma * (1 - dones) * max_next_q_values
+            next_q_values[~masks] = -torch.inf
+            max_next_q_values = next_q_values.max(1)[0]
+            expected_q_values = rewards + self.gamma * max_next_q_values * (1 - dones.float())
 
-        loss = self.loss_fn(state_action_values, target_values)
-
+        loss = self.loss_fn(state_action_values, expected_q_values)
         self.optimizer.zero_grad()
         loss.backward()
-        torch.nn.utils.clip_grad_norm_(self.q_net.parameters(), 1.0)  # stability
+        for param in self.q_net.parameters():
+            param.grad.data.clamp_(-1, 1)
         self.optimizer.step()
-
-        return loss.item()

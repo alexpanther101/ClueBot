@@ -9,7 +9,7 @@ class EliminationBot(Player):
         room = random.choice(self.possibleRooms)
         return suspect, weapon, room
 
-    def playTurn(self):
+    def playTurn(self,obs, valid_mask):
         if not self.inGame:
             return
 
@@ -26,3 +26,5 @@ class EliminationBot(Player):
                 return self.name
             else:
                 print(f"{self.name} made a wrong accusation and is out.")
+                self.inGame = False
+                return None

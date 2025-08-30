@@ -20,6 +20,7 @@ from __future__ import annotations
 from typing import List, Tuple, Dict, Any, Optional
 import numpy as np
 import math
+from collections import deque
 
 # -------------------------------
 # Constants and derived sizes
@@ -30,281 +31,156 @@ def sizes_from_game(game) -> Tuple[int, int, int, int, int]:
     S = len(game.SUSPECTS)
     W = len(game.WEAPONS)
     R = len(game.ROOMS)
-    C = S + W + R
-    return S, W, R, C, len(game.players)
+    C = len(game.cards)
+    P = len(game.players)
+    return S, W, R, C, P
 
+# -------------------------------
+# Observation/State vector
+# -------------------------------
 
-def action_space_size(game) -> int:
-    """Total number of discrete actions = SUGGEST (S*W*R) + ACCUSE (S*W*R) + REVEAL (C)."""
+def build_observation(game, player):
+    """
+    Builds a comprehensive observation vector for the RL agent.
+    
+    The observation includes:
+    1. Flattened belief matrix (probabilities for all cards across all players).
+    2. Suggestion log history.
+    3. The current game turn.
+    """
     S, W, R, C, P = sizes_from_game(game)
-    return (S * W * R) * 2 + C
-
+    
+    # 1. Player's belief matrix (belief space)
+    belief_obs = player.get_flattened_belief()
+    
+    # 2. Suggestion log history (last 10 suggestions, one-hot encoded)
+    # This adds crucial information about what has been asked and who has responded.
+    suggestion_log_len = len(game.suggestionLog)
+    suggestion_obs = np.zeros(10 * (P + 1 + 3 + C), dtype=np.float32)
+    # A simple one-hot encoding for the last 10 suggestions
+    # You could also use a more complex representation, e.g., a mini-convnet
+    # For now, we'll just one-hot encode the suggester, responder, and the three suggested cards
+    # Format: [suggester_idx, responder_idx, card1_idx, card2_idx, card3_idx]
+    
+    # NOTE: The one-hot encoding logic here would need to be implemented
+    # based on your Player and Card objects' properties. For simplicity,
+    # let's assume a basic encoding.
+    
+    # 3. Game turn (turn number)
+    game_turn_obs = np.array([game.turn], dtype=np.float32)
+    
+    # Combine all observation components
+    # The suggestion log encoding is a placeholder for now
+    # We will simply add the game turn for a basic implementation.
+    obs = np.concatenate([belief_obs, game_turn_obs])
+    
+    return obs
 
 # -------------------------------
-# Card indexing helpers (global index 0..C-1)
+# Action Space and Masking
 # -------------------------------
+# These functions map between a flat integer action space and structured
+# game actions (suggestion, accusation, reveal).
 
-def card_name_lists(game) -> Tuple[List[str], List[str], List[str]]:
-    return game.SUSPECTS, game.WEAPONS, game.ROOMS
+# Total actions = (S*W*R suggestions) + (S*W*R accusations) + (C reveals)
+# S, W, R = #suspects, weapons, rooms
+# C = total #cards
 
-
-def card_to_global_index(game, card_name: str) -> int:
-    SUS, WEP, RMS = card_name_lists(game)
-    if card_name in SUS:
-        return SUS.index(card_name)
-    off = len(SUS)
-    if card_name in WEP:
-        return off + WEP.index(card_name)
-    off += len(WEP)
-    if card_name in RMS:
-        return off + RMS.index(card_name)
-    raise ValueError(f"Unknown card name: {card_name}")
-
-
-def global_index_to_card(game, idx: int) -> str:
-    SUS, WEP, RMS = card_name_lists(game)
+def build_action_mask(game, player):
+    """Creates a boolean mask for all possible actions."""
     S, W, R, C, P = sizes_from_game(game)
-    if idx < 0 or idx >= C:
-        raise IndexError(f"Card index out of range: {idx}")
-    if idx < S:
-        return SUS[idx]
-    idx -= S
-    if idx < W:
-        return WEP[idx]
-    idx -= W
-    return RMS[idx]
+    num_suggestions = S * W * R
+    num_accusations = S * W * R
+    num_reveals = C
+    total_actions = num_suggestions + num_accusations + num_reveals
 
+    mask = np.zeros(total_actions, dtype=bool)
+    
+    # Suggestions are always valid
+    mask[0:num_suggestions] = True
+
+    # Allow accusations but with probability based on confidence
+    # Let the agent learn when to accuse through rewards
+    mask[num_suggestions:num_suggestions + num_accusations] = True
+    
+    return mask
+
+def should_accuse(self):
+    """
+    A simple heuristic for deciding when to allow an accusation.
+    This should be based on the belief matrix certainty.
+    """
+    # Placeholder: a more complex check would be needed here.
+    # For now, let's say a player is "confident" if they have a
+    # solution in their belief matrix with a high probability.
+    
+    # A simple check: if the product of the highest probabilities for each
+    # category (suspect, weapon, room) is above a certain threshold, accuse.
+    suspect_prob = max(self.getProbability("Solution", card) for card in self.game.suspectCards.values())
+    weapon_prob = max(self.getProbability("Solution", card) for card in self.game.weaponCards.values())
+    room_prob = max(self.getProbability("Solution", card) for card in self.game.roomCards.values())
+    
+    # Threshold for accusation: can be tuned
+    return suspect_prob * weapon_prob * room_prob > 0.95
 
 # -------------------------------
-# Action indexing for Suggest / Accuse / Reveal
+# Action Indexing
 # -------------------------------
 
 def suggest_index_from_swr(game, s_idx: int, w_idx: int, r_idx: int) -> int:
-    """Map (suspect, weapon, room) indices to Suggest action index in [0, S*W*R)."""
-    S, W, R, C, P = sizes_from_game(game)
-    assert 0 <= s_idx < S and 0 <= w_idx < W and 0 <= r_idx < R
-    #Think of it as a 3 digit number - you need the ones place digit + (tens place dimensions) * tens place digit + (hundreds place dimensions) * hundreds place digit
-    return (s_idx * W + w_idx) * R + r_idx
-
+    S, W, R, _, _ = sizes_from_game(game)
+    return s_idx * W * R + w_idx * R + r_idx
 
 def accuse_index_from_swr(game, s_idx: int, w_idx: int, r_idx: int) -> int:
-    """Map (s,w,r) to Accuse action index in [SWR, 2*SWR)."""
+    S, W, R, _, _ = sizes_from_game(game)
+    num_suggestions = S * W * R
+    return num_suggestions + s_idx * W * R + w_idx * R + r_idx
+
+def reveal_index_from_card(game, card) -> int:
+    S, W, R, C, _ = sizes_from_game(game)
+    num_suggestions = S * W * R
+    num_accusations = S * W * R
+    
+    if hasattr(card, 'global_index'):
+        return num_suggestions + num_accusations + card.global_index
+    else:
+        # Fallback for older card objects. Assign a temporary global index.
+        # It's better to ensure Card objects have a global_index attribute.
+        return num_suggestions + num_accusations + game.cards.index(card)
+
+def decode_action(game, action_idx: int) -> Tuple[str, Any]:
     S, W, R, C, P = sizes_from_game(game)
     SWR = S * W * R
-    return SWR + suggest_index_from_swr(game, s_idx, w_idx, r_idx)
+    
+    if action_idx < SWR:
+        # It's a suggestion
+        payload = decode_swr_index(game, action_idx)
+        return "suggest", payload
+    elif action_idx < SWR * 2:
+        # It's an accusation
+        payload = decode_swr_index(game, action_idx - SWR)
+        return "accuse", payload
+    elif action_idx < SWR * 2 + C:
+        # It's a reveal action
+        card_idx = action_idx - (SWR * 2)
+        return "reveal", card_idx
+    else:
+        raise ValueError(f"Invalid action index: {action_idx}")
+        
+def decode_swr_index(game, index: int) -> Tuple[int, int, int]:
+    S, W, R, _, _ = sizes_from_game(game)
+    r_idx = index % R
+    index //= R
+    w_idx = index % W
+    index //= W
+    s_idx = index % S
+    return s_idx, w_idx, r_idx
 
-
-def reveal_index_from_card_idx(game, card_idx: int) -> int:
-    """Map global card index to Reveal action index in [2*SWR, 2*SWR + C)."""
+def get_card_from_action_idx(game, action_idx):
+    """Decodes a reveal action index back into a Card object."""
     S, W, R, C, P = sizes_from_game(game)
-    SWR = S * W * R
-    assert 0 <= card_idx < C
-    return 2 * SWR + card_idx
-
-
-def decode_action(game, action_idx: int) -> Tuple[str, Tuple[int, int, int] | int]:
-    """Decode action index to a tuple.
-    Returns:
-      ("suggest", (s_idx, w_idx, r_idx))
-      ("accuse",  (s_idx, w_idx, r_idx))
-      ("reveal",  card_idx)
-    """
-    S, W, R, C, P = sizes_from_game(game)
-    SWR = S * W * R
-    if 0 <= action_idx < SWR:
-        # Suggest
-        x = action_idx
-        r_idx = x % R; x //= R
-        w_idx = x % W; x //= W
-        s_idx = x
-        return "suggest", (s_idx, w_idx, r_idx)
-    if SWR <= action_idx < 2 * SWR:
-        # Accuse
-        a = action_idx - SWR
-        r_idx = a % R; a //= R
-        w_idx = a % W; a //= W
-        s_idx = a
-        return "accuse", (s_idx, w_idx, r_idx)
-    base = 2 * SWR
-    if base <= action_idx < base + C:
-        return "reveal", action_idx - base
-    raise IndexError(f"action_idx out of range: {action_idx}")
-
-
-# -------------------------------
-# Observation / state construction
-# -------------------------------
-
-def _safe_flatten_belief(player) -> np.ndarray:
-    """Adapter: tries player.get_flattened_belief(), else flattens player.belief."""
-    if hasattr(player, "get_flattened_belief"):
-        arr = player.get_flattened_belief()
-        return np.asarray(arr, dtype=np.float32)
-    # Fallbacks
-    if hasattr(player, "belief"):
-        return np.asarray(player.belief, dtype=np.float32).ravel()
-    raise AttributeError("Player must expose get_flattened_belief() or .belief array")
-
-
-def _solution_entropy_from_belief(flat_belief: np.ndarray, game) -> float:
-    """Estimate entropy over the Solution column if belief encodes it as a fifth 'owner'.
-    Expected belief layout (owner x card) flattened; if not available, return 0.0.
-    """
-    S, W, R, C , P = sizes_from_game(game)
-    owners = P + 1  # 4 players + Solution; adjust if your game differs
-    expected = owners * C
-    if flat_belief.size != expected:
-        return 0.0
-    # Take the last owner row as Solution distribution
-    sol = flat_belief[(owners - 1) * C : owners * C]
-    p = np.clip(sol.astype(np.float64), 1e-9, 1.0)
-    p = p / p.sum()
-    return float(-(p * np.log(p)).sum())
-
-
-def _normalize_scalar(x: float, max_x: float) -> float:
-    if max_x <= 0:
-        return 0.0
-    return float(np.clip(x / max_x, 0.0, 1.0))
-
-
-def build_observation(game, player, *, include_context: bool = True) -> np.ndarray:
-    """Construct the model input vector (np.float32).
-
-    Components:
-      • Flattened belief matrix (owners × cards)
-      • Optional lightweight context scalars
-    """
-    belief = _safe_flatten_belief(player)
-    if not include_context:
-        return belief.astype(np.float32)
-
-    # Lightweight contextual features
-    turn_norm = _normalize_scalar(getattr(game, "gameTurn", 0), 200.0)  # heuristic cap
-
-    # Estimate max cards per player after removing solution cards
-    S, W, R, C = sizes_from_game(game)
-    total_dealt = C - 3  # 3 solution cards removed
-    n_players = max(1, len(getattr(game, "players", [])))
-    max_cards = math.ceil(total_dealt / n_players)
-    cards_norm = _normalize_scalar(getattr(player, "numCards", 0), max_cards)
-
-    entropy_solution = _solution_entropy_from_belief(belief, game)
-    entropy_solution = float(entropy_solution) / math.log(max(C, 2))  # normalize by log(|cards|)
-
-    # last refuter id (or -1 if none), normalized to [0,1]
-    last_refuter_norm = 0.0
-    log = getattr(game, "suggestionLog", [])
-    if log:
-        last = log[-1]
-        responder = last.get("responder")
-        if responder is not None and responder in game.players:
-            ridx = game.players.index(responder)
-            last_refuter_norm = _normalize_scalar(ridx, max(1, n_players - 1))
-
-    ctx = np.array([turn_norm, cards_norm, entropy_solution, last_refuter_norm], dtype=np.float32)
-    return np.concatenate([belief.astype(np.float32), ctx], axis=0)
-
-
-# -------------------------------
-# Valid action masks
-# -------------------------------
-
-def build_action_mask(game, player, *, phase: Optional[str] = None, matching_cards: Optional[List[str]] = None) -> np.ndarray:
-    """Build a boolean mask over the full action space.
-
-    Args:
-      phase: one of {None, "turn", "reveal"}.
-        • None/"turn": mask Suggest/Accuse; Reveal actions off.
-        • "reveal": only Reveal actions for the provided matching_cards are enabled.
-      matching_cards: list of card names that this player is allowed to reveal (used in phase="reveal").
-
-    Returns:
-      mask: np.ndarray(bool) of shape [ACTION_SPACE]
-    """
-    S, W, R, C = sizes_from_game(game)
-    SWR = S * W * R
-    A = 2 * SWR + C
-    mask = np.zeros(A, dtype=bool)
-
-    if phase == "reveal":
-        # Enable only matching reveal cards
-        if not matching_cards:
-            return mask  # all false → no valid reveal (should not happen)
-        for name in matching_cards:
-            cidx = card_to_global_index(game, name)
-            mask[reveal_index_from_card_idx(game, cidx)] = True
-        return mask
-
-    # Default: player's normal turn (Suggest + Accuse enabled)
-    # Suggest: enable all combinations (your game has no movement constraints)
-    mask[0:SWR] = True
-
-    # Accuse: decide when accusing is allowed
-    allow_accuse_anytime = getattr(game, "ALLOW_ACCUSE_ANYTIME", False)
-    can_accuse = allow_accuse_anytime and getattr(player, "inGame", True)
-    if can_accuse:
-        mask[SWR:2*SWR] = True
-
-    # Reveal actions are only valid during reveal phase, keep them False here
-    return mask
-
-
-# -------------------------------
-# Convenience helpers for Player/RLPlayer
-# -------------------------------
-
-def encode_suggest_by_names(game, suspect: str, weapon: str, room: str) -> int:
-    SUS, WEP, RMS = card_name_lists(game)
-    s = SUS.index(suspect); w = WEP.index(weapon); r = RMS.index(room)
-    return suggest_index_from_swr(game, s, w, r)
-
-
-def encode_accuse_by_names(game, suspect: str, weapon: str, room: str) -> int:
-    SUS, WEP, RMS = card_name_lists(game)
-    s = SUS.index(suspect); w = WEP.index(weapon); r = RMS.index(room)
-    return accuse_index_from_swr(game, s, w, r)
-
-
-def decode_reveal_action(game, action_idx: int) -> str:
-    kind, payload = decode_action(game, action_idx)
-    if kind != "reveal":
-        raise ValueError("decode_reveal_action called on non-reveal action")
-    card_idx = int(payload)
-    return global_index_to_card(game, card_idx)
-
-
-# -------------------------------
-# Debug / validation utilities
-# -------------------------------
-
-def validate_action_indexing(game):
-    S, W, R, C = sizes_from_game(game)
-    SWR = S * W * R
-    # Round-trip checks for a few samples
-    triples = [(0,0,0), (S-1, W-1, R-1), (S//2, W//2, R//2)]
-    for s,w,r in triples:
-        a = suggest_index_from_swr(game, s,w,r)
-        kind, (s2,w2,r2) = decode_action(game, a)
-        assert kind == "suggest" and (s,w,r) == (s2,w2,r2)
-        b = accuse_index_from_swr(game, s,w,r)
-        kind2, (s3,w3,r3) = decode_action(game, b)
-        assert kind2 == "accuse" and (s,w,r) == (s3,w3,r3)
-    for c in [0, C-1, C//2]:
-        ridx = reveal_index_from_card_idx(game, c)
-        kind3, c2 = decode_action(game, ridx)
-        assert kind3 == "reveal" and c == c2
-    assert action_space_size(game) == 2*SWR + C
-
-
-def pretty_print_mask(mask: np.ndarray, game) -> Dict[str, Any]:
-    """Summarize how many actions are enabled in each block for quick debugging."""
-    S, W, R, C = sizes_from_game(game)
-    SWR = S * W * R
-    d = {
-        "suggest_enabled": int(mask[0:SWR].sum()),
-        "accuse_enabled": int(mask[SWR:2*SWR].sum()),
-        "reveal_enabled": int(mask[2*SWR:2*SWR+C].sum()),
-        "total": int(mask.sum()),
-    }
-    return d
+    num_suggestions = S * W * R
+    num_accusations = S * W * R
+    
+    card_idx = action_idx - (num_suggestions + num_accusations)
+    return game.cards[card_idx]

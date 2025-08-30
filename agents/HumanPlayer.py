@@ -1,7 +1,10 @@
 from ClueBasics.Player import Player
 
 class HumanPlayer(Player):
-
+    def __init__(self, name, game, type):
+        super().__init__(name, game, type)
+        self.game.hasHuman = True
+        
     def chooseCard(self, all_cards):
         if(len(all_cards) == 1):
             return all_cards[0]
@@ -29,10 +32,13 @@ class HumanPlayer(Player):
         return suspect, weapon, room
 
     def chooseAccusation(self):
-        print(f"\n🚨 {self.name}, make an accusation.")
-        suspect = self.chooseCard("Choose a suspect:", list(self.game.suspectCards.values()))
-        weapon = self.chooseCard("Choose a weapon:", list(self.game.weaponCards.values()))
-        room = self.chooseCard("Choose a room:", list(self.game.roomCards.values()))
+        print(f"\n{self.name}, make an accusation.")
+        print("Choose a suspect:")
+        suspect = self.chooseCard( list(self.game.suspectCards.values()))
+        print("Choose a weapon:")
+        weapon = self.chooseCard(list(self.game.weaponCards.values()))
+        print("Choose a room:")
+        room = self.chooseCard(list(self.game.roomCards.values()))
         return suspect, weapon, room
 
     def refuteSuggestion(self, suggestionCards):

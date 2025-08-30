@@ -18,6 +18,7 @@ class BayesianLearner(Player):
     
     def highestSolutionChance(self, category):
         max_prob = max(self.getProbability("Solution", card) for card in category)
+        
         tied_cards = [card for card in category if self.getProbability("Solution", card) == max_prob]
         max_entropy = max(self.entropy(card) for card in tied_cards)
         tied_entropy = [card for card in category if self.entropy(card) == max_entropy]
@@ -161,7 +162,8 @@ class BayesianLearner(Player):
             if len(possible_cards) == 1:
                 # Only one possible card => must be the one shown
                 shown_card = possible_cards[0]
-                print(f"Turn {int(turn/len(self.players))}: Deduced {responder} showed {shown_card}")
+                if not self.game.hasHuman:
+                    print(f"Turn {int(turn/len(self.players))}: Deduced {responder} showed {shown_card}")
                 self.crossOff(responder, shown_card)  # sets to (1,1), zeros others
                 
                 rec["card_shown"] = shown_card  # Save for future use
@@ -190,7 +192,9 @@ class BayesianLearner(Player):
         responder, card = self.game.makeSuggestion(self, perp, weapon, room)
         #Eliminates the new card
         if not responder is None:
-            print(f"{responder.name} showed a card - {card.name}.")
+            if not self.game.hasHuman:
+                print(f"{responder.name} showed a card - {card.name}.")
+            else: print(f"{responder.name} showed a card")
             self.crossOff(responder, card)
             for owner in self.owners:
                         if not owner == responder:

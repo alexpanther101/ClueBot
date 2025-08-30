@@ -1,7 +1,8 @@
 import time 
 import random
 from .Card import Card
-from collections import deque
+
+
 
 class GameRules:
     """Class to run and manage the main game loop and the game mechanisms"""
@@ -9,22 +10,18 @@ class GameRules:
     ROOMS = ["Study", "Hall", "Lounge", "Library", "Billiard Room", "Dining Room", "Conservatory", "Ballroom", "Kitchen"]
     SUSPECTS = ["Colonel Mustard", "Reverend Green", "Miss Scarlet", "Mrs. Peacock", "Mrs White", "Professor Plum" ]
     WEAPONS = ["Knife", "Candlestick", "Rope", "Revolver", "Wrench", "Lead Pipe"]
+    # gameboard = [[]]
     
-    def __init__(self, players, hasHuman = False):
+    def __init__(self, players):
         self.players = players
-        self.numPlayers = len(players)
         self.suspectCards = {}
         self.weaponCards = {}
         self.roomCards = {}
         self.deck = {}
         self.cards = []
-        self.hasHuman = hasHuman
-        self.suggestionLog = deque(maxlen=10) # Using a deque to limit memory usage
+        self.suggestionLog = []
         self.turn=0
         self.gameTurn = 0
-        self.solution = None # Will be set in reset_game()
-        self.last_reward = 0.0 # New attribute to store the last calculated reward
-        
         for card in self.SUSPECTS:
             suspect = Card("Suspect", card)
             self.suspectCards[card] = suspect
@@ -42,62 +39,42 @@ class GameRules:
             self.roomCards[card] = (room)
             self.deck[card] = room
             self.cards.append(room)
-            
-        for i, card in enumerate(self.cards):
-            card.global_index = i
-        # We need a solution set up from the beginning
-        self.updateSolution()
-        
-        for player in players:
-            player.setOpponents([p for p in players if p != player])
-
-    def updateSolution(self):
-        """Randomly selects a new solution for the game"""
-        suspect = random.choice(self.SUSPECTS)
-        weapon = random.choice(self.WEAPONS)
-        room = random.choice(self.ROOMS)
+                    
         self.solution = {
-            "suspect": self.suspectCards[suspect],
-            "weapon": self.weaponCards[weapon],
-            "room": self.roomCards[room]
+            "Suspect" : random.choice(list(self.suspectCards.values())),
+            "Weapon" : random.choice(list(self.weaponCards.values())),
+            "Room" : random.choice(list(self.roomCards.values()))
         }
-    
-    def reset_game(self):
-        """Resets the game state for a new episode."""
-        self.turn = 0
-        self.gameTurn = 0
-        self.suggestionLog.clear()
-        self.updateSolution()
-        for player in self.players:
-            player.cards = []
-            player.inGame = True
-            player.initialCrossOff()
+        
+        #Take out solution cards from deck
+        self.deck.pop((self.solution.get("Suspect")).getName())
+        self.deck.pop((self.solution.get("Weapon")).getName())
+        self.deck.pop((self.solution.get("Room")).getName())
 
+#--------------------- Game mechanics -----------------------------------------------------------------------
+        
     def makeAccusation(self, player, perp, weapon, room):
-        """
-        Processes an accusation.
-        Returns True if the accusation is correct, False otherwise.
-        """
-        is_correct = (
-            perp == self.solution["Suspect"] and
-            weapon == self.solution["Weapon"] and
-            room == self.solution["Room"]
+        """Player makes an accusation. Returns True if correct, False otherwise."""
+        print(f"{player.name} accuses {perp.name} with a {weapon.name} in the {room.name}")
+        
+        correct = (
+            self.solution.get("Suspect") == perp and
+            self.solution.get("Weapon") == weapon and
+            self.solution.get("Room") == room
         )
         
-        if is_correct:
-            # Game ends
-            self.last_reward = self.calculate_accusation_reward(True)
-            print(f"Correct accusation by {player.name}! The solution was {perp.name}, {weapon.name}, {room.name}.")
+        if correct:
+            print(f"{player.name} has won!")
+            if hasattr(player, "store_transition"):
+                player.store_transition(1.0, None, True)
             return True
         else:
-            # Player is eliminated
+            if hasattr(player, "store_transition"):
+                player.store_transition(-1.0, None, True)
             player.inGame = False
-            self.last_reward = self.calculate_accusation_reward(False)
-            print(f"Incorrect accusation by {player.name}. The solution was not {perp.name}, {weapon.name}, {room.name}.")
             return False
 
-    def get_last_reward(self):
-        return self.last_reward
+    
     
     
     def makeSuggestion(self, player, perp, weapon, room):
@@ -188,19 +165,6 @@ class GameRules:
     
     def dealCards(self):
         """Deals and rules out initial cards"""
-        self.solution = {
-            "Suspect" : random.choice(list(self.suspectCards.values())),
-            "Weapon" : random.choice(list(self.weaponCards.values())),
-            "Room" : random.choice(list(self.roomCards.values()))
-        }
-        
-        #Take out solution cards from deck
-        self.deck.pop((self.solution.get("Suspect")).getName())
-        self.deck.pop((self.solution.get("Weapon")).getName())
-        self.deck.pop((self.solution.get("Room")).getName())
-        
-        #print("Solution cards are "+(self.solution.get("Suspect")).getName()+ ", "+self.solution.get("Weapon").getName()+", "+self.solution.get("Room").getName())
-        
         deckCards = list(self.deck.keys())
         random.shuffle(deckCards)
         playerIter =0
@@ -234,52 +198,41 @@ class GameRules:
             if(player.inGame):
                 return player
             
-    
-    # ... (unchanged game loop methods)
+         
     def gameLoop(self):
-        """Main game loop - this is now handled by the trainer"""
-        # The trainer class will manage the game loop and player turns.
-        # This method is now effectively deprecated in the RL context.
-        pass
+        """Main game loop"""   
+        self.dealCards()
+        while(True):
+            self.gameTurn+=1
+            print("Turn "+str(self.gameTurn))
+            if not (self.checkAllPlayers()):
+                break
+            
+            for player in self.players:
+                obs = self.getObservation(player)
+                valid_mask = self.getValidActionsMask(player)
+                winner = player.playTurn(obs, valid_mask)
+                self.turn+=1
+                if(winner):
+                    return
+
+#---------------------------------- RL API -------------------------------------------------------
+
+def getObservation(self, player):
+    """Returns the observation for a given player
+       For now, it returns the flattened belief matrix --> later will add turn information
     
-    # --- NEW METHODS FOR RL REWARDS ---
+    """
+    return player.getFlattenedBeliefs()
+
+def getValidActionsMask(self, player):
+    """Returns a boolean mask of the valid actions a player can make.
+    Length = action space (suggestion + accusations + card reveals)
+    """
+    from rl.utils import build_action_mask
+    return build_action_mask(self, player)
+
+         
     
-    def calculate_accusation_reward(self, is_correct):
-        """Calculates the reward for an accusation."""
-        self.last_reward = 1000.0 if is_correct else -1000.0
-        return self.last_reward
-
-    def calculate_suggestion_reward(self, responder, rl_player, last_log_len):
-        """
-        Calculates a reward for a suggestion.
-        A positive reward if an opponent responds with a card, 
-        and a small negative reward if they do not.
-        """
-        if responder and responder != rl_player:
-            # Gained new information
-            self.last_reward = 1.0
-        else:
-            # No new info from an opponent, a less efficient move
-            self.last_reward = -0.5
-        return self.last_reward
-
-    def calculate_reveal_reward(self, revealed_card):
-        """Calculates a reward for a reveal. More complex rewards could be added."""
-        # A simple reward: maybe a small positive reward for revealing a less valuable card
-        # Or a negative reward for revealing a valuable card
-        self.last_reward = 0.1 # Placeholder: a small positive reward for now
-        return self.last_reward
     
-    def get_last_reward(self):
-        return self.last_reward
-
-    # ... (unchanged RL API methods)
-    def getObservation(self, player):
-        """Returns the observation for a given player"""
-        from rl.utils import build_observation
-        return build_observation(self, player)
-
-    def getValidActionsMask(self, player):
-        """Returns a boolean mask of the valid actions a player can make."""
-        from rl.utils import build_action_mask
-        return build_action_mask(self, player)
+  

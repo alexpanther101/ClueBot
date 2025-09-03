@@ -47,10 +47,6 @@ def run_game_loop(players_list,game, rl_agent=None):
     # Set up the game
     game.reset_game()
     game.dealCards()
-    
-    # Let each player perform their initial logic
-    for player in players_list:
-        player.initialCrossOff()
 
     tempstr = "\nGame has started! Solution is hidden.\n ------------------------------------------"
     logging.info(tempstr)
@@ -132,9 +128,9 @@ if __name__ == "__main__":
     players = [
         #rl_player,
         BayesianLearner("Bayesian_A", game, "Bayesian"),
-        TriggerHappyBot("Trig1", game, "Trigger"), 
+        TriggerHappyBot("Bayesian_B", game, "Bayesian"), 
         EliminationBot("ElimA", game, "Elimination"), 
-        #HumanPlayer("Sharanya", game, "Human")
+        EliminationBot("Parth", game, "Elimination")
     ]
     # --- Run the game ---
     run_game_loop(players, game)

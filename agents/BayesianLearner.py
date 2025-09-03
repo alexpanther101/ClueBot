@@ -25,13 +25,89 @@ class BayesianLearner(Player):
         tied_entropy = [card for card in category if self.entropy(card) == max_entropy]
         return random.choice(tied_entropy)
         
+    def removeCardFromPossibleCategories(self, card):
+        """Remove a card from possible categories when we know a player has it (not in solution)"""
+        if card.getType() == 'Suspect':
+            if card in self.possibleSuspects:    
+                self.possibleSuspects.remove(card)
+                logging.info(f"Removed {card} from possible suspects - a player has it")
+                
+        elif card.getType() == 'Weapon':
+            if card in self.possibleWeapons:
+                self.possibleWeapons.remove(card)
+                logging.info(f"Removed {card} from possible weapons - a player has it")
+                
+        else:
+            if card in self.possibleRooms: 
+                self.possibleRooms.remove(card)
+                logging.info(f"Removed {card} from possible rooms - a player has it")
+                
+    def removeOtherCardsFromPossibleCategories(self, card):
+        """Remove other cards from possible categories when we know one card is in the solution"""
+        if card.getType() == 'Suspect':
+            cards_to_remove = [otherCard for otherCard in self.possibleSuspects if otherCard != card]
+            for otherCard in cards_to_remove:    
+                self.possibleSuspects.remove(otherCard)
+                # Set these other cards' solution probability to 0
+                self.setProbability("Solution", otherCard, 0)
+                logging.info(f"Removed {otherCard} from possible suspects - {card} is the solution suspect")
+                
+        elif card.getType() == 'Weapon':
+            cards_to_remove = [otherCard for otherCard in self.possibleWeapons if otherCard != card]
+            for otherCard in cards_to_remove:    
+                self.possibleWeapons.remove(otherCard)
+                # Set these other cards' solution probability to 0
+                self.setProbability("Solution", otherCard, 0)
+                logging.info(f"Removed {otherCard} from possible weapons - {card} is the solution weapon")
+                
+        else:
+            cards_to_remove = [otherCard for otherCard in self.possibleRooms if otherCard != card]
+            for otherCard in cards_to_remove:    
+                self.possibleRooms.remove(otherCard)
+                # Set these other cards' solution probability to 0
+                self.setProbability("Solution", otherCard, 0)
+                logging.info(f"Removed {otherCard} from possible rooms - {card} is the solution room")
+    
+    def checkForSolutionCards(self):
+        """Check for cards that must be in the solution or ruled out from solution"""
+        for card in self.game.cards:
+            solution_prob = self.getProbability("Solution", card)
+            # Case 1: If solution probability is 0, remove from possible categories
+            # (This means a player definitely has it)
+            if solution_prob == 0:
+                self.removeCardFromPossibleCategories(card)
+            
+            # Case 2: If solution probability is 1, remove other cards from same category
+            elif solution_prob >= 1.0:
+                logging.info(f"Confirmed {card} is in the solution")
+                self.removeOtherCardsFromPossibleCategories(card)
+            
+            # Case 3: If no player can have the card, it must be in the solution
+            else:
+                non_solution_total = sum(self.getProbability(owner, card) 
+                                       for owner in self.owners if owner != "Solution")
+                if non_solution_total == 0 and solution_prob < 1.0:
+                    logging.info(f"No player can have {card} - must be in solution")
+                    # Set solution probability to 1 and zero out all others
+                    for owner in self.owners:
+                        if owner == "Solution":
+                            self.setProbability(owner, card, 1.0)
+                        else:
+                            self.setProbability(owner, card, 0)
+                    
+                    # Remove other cards from same category since this one is the solution
+                    self.removeOtherCardsFromPossibleCategories(card)
     
     #Initial cross off and belief matrix set up
     def initialCrossOff(self):
         self.createBeliefMatrix()
+        for card in self.cards:
+            self.crossOff(self, card)
+        self.checkForSolutionCards()
     
     #Cross off a card from possibilities
     def crossOff(self, owner, card):
+        # Remove from possible categories since a player has it
         if(card.getType() == 'Suspect'):
             if(card in self.possibleSuspects):    
                 self.possibleSuspects.remove(card)
@@ -44,11 +120,13 @@ class BayesianLearner(Player):
             if(card in self.possibleRooms): 
                 self.possibleRooms.remove(card)
         
+        # Set probabilities: owner has it (1), everyone else doesn't (0)
         for op in self.owners:
             self.setProbability(op, card, 0)
         
         self.setProbability(owner, card, 1)
         
+        # Redistribute probabilities for other cards that this owner might have
         for other_card in self.ownersAndCards[owner]:
             if other_card == card:
                 continue
@@ -57,6 +135,9 @@ class BayesianLearner(Player):
                 self.setProbability(owner, other_card, prob-0.04)
             else:
                 self.setProbability(owner, other_card, prob/2)
+        
+        # Check if any other cards must now be in the solution
+        self.checkForSolutionCards()
     
     def chooseSuggestion(self):
         suspect = self.highestSolutionChance(self.possibleSuspects)
@@ -66,10 +147,12 @@ class BayesianLearner(Player):
     
     def processNewSuggestions(self):
         public_log = self.game.getPublicSuggestionLog(self)
+        print(public_log)
+        print("last processed turn " + str(self.lastProcessedTurn))
         for rec in public_log:
             if rec["turn"] <= self.lastProcessedTurn:
                 continue  # Already processed
-            
+            logging.info("Processing turn: "+str(rec["turn"]))
             suggester = rec["suggester"]
             responder = rec["responder"]
             suggestion_cards = rec["suggestion"]
@@ -80,7 +163,15 @@ class BayesianLearner(Player):
             if responder:
                 if card_shown:
                     self.crossOff(responder, card_shown)
-                    #CHECK For the rest of the players, increase chances of their having the other cards ->
+                     # Players who skipped can't have any of the suggested cards
+                    for skipped_player in skipped_players:
+                        for card in suggestion_cards:
+                            logging.info(f"Processing - set {skipped_player.name}'s {card.name} to 0")
+                            if self.getProbability(skipped_player, card) != 0:
+                                self.setProbability(skipped_player, card, 0)
+                                
+                    
+                    # For the rest of the players, increase chances of their having the other cards                                
                     for owner in self.owners:
                         if not owner == responder:
                             for card in self.game.cards:
@@ -96,9 +187,11 @@ class BayesianLearner(Player):
                     # Players who skipped can't have any of the suggested cards
                     for skipped_player in skipped_players:
                         for card in suggestion_cards:
+                            logging.info(f"Processing - set {skipped_player.name}'s {card.name} to 0")
                             if self.getProbability(skipped_player, card) != 0:
                                 self.setProbability(skipped_player, card, 0)
-                            #CHECK increase the probability of their having the other cards 
+                        
+                        # Increase the probability of their having the other cards 
                         for card in self.game.cards:
                             if self.getProbability(skipped_player, card) != 0 and self.getProbability(skipped_player, card) != 1:
                                 prob = self.ownersAndCards[skipped_player][card]
@@ -106,18 +199,26 @@ class BayesianLearner(Player):
                                     self.setProbability(skipped_player, card, prob + 0.05)
                                 else:
                                     self.setProbability(skipped_player, card,  prob  + (1-prob)/2)
-                            # CHECK increase the probability of the card being with the remaining players
-                            self.normalizeCardAcrossPlayers(card, skipped_players)
-                            
+                        
+                        # Normalize the suggested cards across remaining players
+                        for card in suggestion_cards:
+                            remaining_players = [p for p in self.owners if p != skipped_player]
+                            self.normalizeCardAcrossPlayers(card, remaining_players)
+                    
+                    # After processing skipped players, check for solution cards
+                    self.checkForSolutionCards()
 
             else:
+                # No one responded - suggester must have all cards or they're in solution
                 for card in suggestion_cards:
                     for player in self.owners:
                         if player not in [suggester, 'Solution']:
                             self.setProbability(player, card, 0)
                     
                     self.normalizeCardAcrossPlayers(card, [suggester, 'Solution'])
-                                
+                
+                # Check if any cards must be in solution after this update
+                self.checkForSolutionCards()
                                 
             self.privateSuggestionLog.append(rec)               
             
@@ -131,19 +232,18 @@ class BayesianLearner(Player):
             prob = self.ownersAndCards[player][card]
             fractions.append((player, prob))
 
-        
         total = sum(frac for _, frac in fractions)
         if total == 0:
             return 
 
-        # Step 3: Normalize each player's fraction
-        normalized = []
+        # Normalize each player's fraction
         for player, frac in fractions:
             new_frac = frac / total
             self.ownersAndCards[player][card] = new_frac
+        
+        # After normalization, check if solution status changed
+        self.checkForSolutionCards()
             
-            
-    
     def runBackwardInference(self):
         for rec in self.privateSuggestionLog:
             responder = rec["responder"]
@@ -164,9 +264,9 @@ class BayesianLearner(Player):
                 # Only one possible card => must be the one shown
                 shown_card = possible_cards[0]
                 if not self.game.hasHuman:
-                    print(f"Turn {int(turn/len(self.players))}: Deduced {responder} showed {shown_card}")
-                logging.info(f"Turn {int(turn/len(self.players))}: Deduced {responder} showed {shown_card}")
-                self.crossOff(responder, shown_card)  # sets to (1,1), zeros others
+                    print(f"Turn {int(turn)}: Deduced {responder} showed {shown_card}")
+                logging.info(f"Turn {int(turn)}: Deduced {responder} showed {shown_card}")
+                self.crossOff(responder, shown_card)  # This will also check for solution cards
                 
                 rec["card_shown"] = shown_card  # Save for future use
 
@@ -188,29 +288,30 @@ class BayesianLearner(Player):
         logging.info(self.name+"'s possible suspects "+str(self.possibleSuspects))
         logging.info(self.name+"'s possible weapons "+str(self.possibleWeapons))
         logging.info(self.name+"'s possible rooms "+str(self.possibleRooms))
-        logging.info(self.name+"'s belief matrix "+str(self.ownersAndCards))
         
         self.processNewSuggestions()
         perp, weapon, room = self.chooseSuggestion()
-        responder, card = self.game.makeSuggestion(self, perp, weapon, room)
-        #Eliminates the new card
+        responder, shown_card = self.game.makeSuggestion(self, perp, weapon, room)
+        
+        # Eliminates the new card
         if not responder is None:
             if not self.game.hasHuman:
-                print(f"{responder.name} showed a card - {card.name}.")
+                print(f"{responder.name} showed a card - {shown_card.name}.")
             else: print(f"{responder.name} showed a card")
-            logging.info(f"{responder.name} showed a card - {card.name}.")
-            self.crossOff(responder, card)
+            self.crossOff(responder, shown_card)
+            
+            # Update probabilities for other players
             for owner in self.owners:
-                        if not owner == responder:
-                            for card in self.game.cards:
-                                if (not card == card) and (not self.getProbability(owner, card) == 1) and (not self.getProbability(owner, card) == 0):
-                                    prob = self.ownersAndCards[owner][card]
-                                    if prob <0.97:
-                                        self.setProbability(owner, card, prob + 0.03)
-                                    else: 
-                                        self.setProbability(owner,  card,  prob + (1- prob)/2 )
+                if not owner == responder:
+                    for card in self.game.cards:
+                        if (not card == shown_card) and (not self.getProbability(owner, card) == 1) and (not self.getProbability(owner, card) == 0):
+                            prob = self.ownersAndCards[owner][card]
+                            if prob <0.97:
+                                self.setProbability(owner, card, prob + 0.03)
+                            else: 
+                                self.setProbability(owner,  card,  prob + (1- prob)/2 )
                                 
-            self.normalizeCardAcrossPlayers(card, self.owners)
+            self.normalizeCardAcrossPlayers(shown_card, self.owners)
             self.processNewSuggestions()
             
         if responder is None:
@@ -218,7 +319,10 @@ class BayesianLearner(Player):
                 if self.makeAccusation(perp, weapon, room):
                     return self.name
 
-                
+        # Check if we can make a definitive accusation
         if len(self.possibleSuspects) == 1 and len(self.possibleRooms) == 1 and len(self.possibleWeapons) == 1:
             if self.makeAccusation(self.possibleSuspects[0], self.possibleWeapons[0], self.possibleRooms[0]):
                 return self.name
+            
+        
+        logging.info(self.name+"'s belief matrix "+str(self.ownersAndCards))

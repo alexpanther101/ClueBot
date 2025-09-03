@@ -2,6 +2,7 @@ from .GameRules import GameRules
 import random
 from .Card import Card
 from abc import ABC, abstractmethod
+import logging
 
 # Player is an abstract class that bots inherit from
 class Player(ABC):
@@ -11,8 +12,11 @@ class Player(ABC):
         self.name = name
         self.game = game
         self.possibleSuspects = list(game.suspectCards.values())
+        print(self.possibleSuspects)
         self.possibleWeapons = list(game.weaponCards.values())
+        print(self.possibleWeapons)
         self.possibleRooms = list(game.roomCards.values())
+        print(self.possibleRooms)
         self.inGame = True
         self.cards = []
         self.numCards = 0
@@ -54,7 +58,7 @@ class Player(ABC):
         for player in self.players: 
             num_cards = player.getNumCards()
             for card in self.game.cards:
-                self.ownersAndCards[player][card] = num_cards/ total_cards
+                self.ownersAndCards[player][card] = num_cards/total_cards
 
         for card in self.game.suspectCards.values():
             self.ownersAndCards["Solution"][card] = 1/ len(self.game.SUSPECTS)
@@ -70,7 +74,6 @@ class Player(ABC):
     #Deals a card to self    
     def isDealt(self, card):
         self.cards.append(card)
-        self.crossOff(self, card)
         self.numCards+=1
     
 #---------------------------------------------------------------------------------------------

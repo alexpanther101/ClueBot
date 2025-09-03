@@ -54,9 +54,6 @@ def test_action_system():
         game.reset_game()
         game.dealCards()
         
-        for player in players:
-            player.initialCrossOff()
-        
         print("✓ Game initialized successfully")
         
     except Exception as e:

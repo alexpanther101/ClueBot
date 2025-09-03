@@ -21,7 +21,7 @@ class GameRules:
         self.cards = []
         self.hasHuman = hasHuman
         self.suggestionLog = deque(maxlen=10) # Using a deque to limit memory usage
-        self.turn=0
+        self.turn=1
         self.gameTurn = 0
         self.solution = None # Will be set in reset_game()
         self.last_reward = 0.0 # New attribute to store the last calculated reward
@@ -65,14 +65,13 @@ class GameRules:
     
     def reset_game(self):
         """Resets the game state for a new episode."""
-        self.turn = 0
+        self.turn = 1
         self.gameTurn = 0
         self.suggestionLog.clear()
         self.updateSolution()
         for player in self.players:
             player.cards = []
             player.inGame = True
-            player.initialCrossOff()
 
     def makeAccusation(self, player, perp, weapon, room):
         """
@@ -104,7 +103,7 @@ class GameRules:
     def makeSuggestion(self, player, perp, weapon, room):
         """Implements the suggestion mechanism. Returns the responder and the card shown""" 
         print(f"{player.name} suggests: {perp} with {weapon} in {room}")
-        
+        logging.info(f"{player.name} suggests: {perp} with {weapon} in {room}")
         suggestionCards = [perp, weapon, room]
         playerPos = self.players.index(player) 
         i = (playerPos +1) % len(self.players)
@@ -137,7 +136,7 @@ class GameRules:
                 suggestion_record['responder'] = self.players[i]
                 suggestion_record['card_shown'] = cardShown
                 self.suggestionLog.append(suggestion_record)
-                
+                logging.info(f"{self.players[i].name} showed a card - {cardShown.name}" )
                 # reward the suggester a small positive signal if someone shows a card (info gain)
                 try:
                     # Suggester is 'player' argument to makeSuggestion

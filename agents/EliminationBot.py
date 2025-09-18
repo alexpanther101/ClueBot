@@ -3,6 +3,12 @@ import random
 
 class EliminationBot(Player):
     
+    def initialCrossOff(self):
+        super().initialCrossOff()
+        for card in self.cards:
+            self.crossOff(self, card)
+        return
+    
     def chooseSuggestion(self):
         suspect = random.choice(self.possibleSuspects)
         weapon = random.choice(self.possibleWeapons)

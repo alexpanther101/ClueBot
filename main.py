@@ -11,7 +11,7 @@ from ClueBasics.GameRules import GameRules
 from agents import BayesianLearner, TriggerHappyBot, EliminationBot, HumanPlayer
 from rl.RLPlayer import RLPlayer
 from rl.DQNAgent import DQNAgent
-from rl.utils import build_observation, build_action_mask, sizes_from_game
+from rl.utils import build_observation, build_action_mask, sizes_from_game, calculate_observation_size
 
 def load_rl_agent(checkpoint_path, game_rules, device):
     """
@@ -19,7 +19,7 @@ def load_rl_agent(checkpoint_path, game_rules, device):
     """
     # Assuming input_dim is based on the belief matrix + game turn
     S, W, R, C, P = sizes_from_game(game_rules)
-    input_dim = (P + 1) * C + 1  # 1 for belief + turn number
+    input_dim = calculate_observation_size(game_rules)  
 
     agent = DQNAgent(
         game_rules=game_rules,
@@ -47,7 +47,8 @@ def run_game_loop(players_list,game, rl_agent=None):
     # Set up the game
     game.reset_game()
     game.dealCards()
-
+    logging.info(f"{players[0].name}'s belief matrix after cards were dealt!")
+    logging.info(str(players[0].ownersAndCards))
     tempstr = "\nGame has started! Solution is hidden.\n ------------------------------------------"
     logging.info(tempstr)
     print(tempstr)
@@ -128,9 +129,9 @@ if __name__ == "__main__":
     players = [
         #rl_player,
         BayesianLearner("Bayesian_A", game, "Bayesian"),
-        TriggerHappyBot("Bayesian_B", game, "Bayesian"), 
+        TriggerHappyBot("TriggerHappyBot", game, "Trigger"), 
         EliminationBot("ElimA", game, "Elimination"), 
-        EliminationBot("Parth", game, "Elimination")
+        HumanPlayer("Parth", game, "HumanPlayer")
     ]
     # --- Run the game ---
     run_game_loop(players, game)

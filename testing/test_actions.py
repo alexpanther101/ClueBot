@@ -25,7 +25,8 @@ def test_action_system():
         S, W, R, C, P = sizes_from_game(game)
         print(f"Game dimensions: S={S}, W={W}, R={R}, C={C}, P={P}")
         
-        input_dim = (P + 1) * C + 1  # Same as in your main.py
+        from rl.utils import calculate_observation_size
+        input_dim = calculate_observation_size(game)
         print(f"Input dimension: {input_dim}")
         
         agent = DQNAgent(game_rules=game, input_dim=input_dim)

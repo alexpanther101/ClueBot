@@ -18,8 +18,8 @@ class CurriculumTrainer:
         batch_size=64,
         gamma=0.99,
         target_update=100,
-        learning_starts=1000,
-        train_freq=4,
+        learning_starts=100,
+        train_freq=1,
         checkpoint_path=None,
         log_interval=50,
         device=None
@@ -57,7 +57,7 @@ class CurriculumTrainer:
                 'episodes': 1000,
                 'opponents': ['EliminationBot'],
                 'num_players': 3,
-                'win_threshold': 0.6,
+                'win_threshold': 0.4,
                 'epsilon_start': 1.0,
                 'epsilon_end': 0.4
             },
@@ -66,7 +66,7 @@ class CurriculumTrainer:
                 'episodes': 1500,
                 'opponents': ['EliminationBot', 'EliminationBot'],
                 'num_players': 3,
-                'win_threshold': 0.5,
+                'win_threshold': 0.4,
                 'epsilon_start': 0.4,
                 'epsilon_end': 0.2
             },
@@ -75,7 +75,7 @@ class CurriculumTrainer:
                 'episodes': 2000,
                 'opponents': ['EliminationBot', 'TriggerHappyBot'],
                 'num_players': 4,
-                'win_threshold': 0.4,
+                'win_threshold': 0.6,
                 'epsilon_start': 0.2,
                 'epsilon_end': 0.1
             },

@@ -1,3 +1,9 @@
+import sys
+import os
+
+# Add parent directory to path
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
 # test_basic_rl.py
 from ClueBasics.GameRules import GameRules
 from agents import EliminationBot
@@ -9,7 +15,8 @@ from rl.utils import sizes_from_game
 # Test with just RL player vs EliminationBot
 game = GameRules([])
 S, W, R, C, P = sizes_from_game(game)
-input_dim = (P + 1) * C + 1
+from rl.utils import calculate_observation_size
+input_dim = calculate_observation_size(game)
 
 agent = DQNAgent(game_rules=game, input_dim=input_dim)
 rl_player = RLPlayer("TestBot", game, "RL")

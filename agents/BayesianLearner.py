@@ -101,8 +101,16 @@ class BayesianLearner(Player):
     #Initial cross off and belief matrix set up
     def initialCrossOff(self):
         self.createBeliefMatrix()
+        logging.info("Creating belief matrix")
+        logging.info(self.ownersAndCards)
+        logging.info("Crossing off")
         for card in self.cards:
             self.crossOff(self, card)
+        
+        for card in self.game.cards:
+            if card not in self.cards:
+                self.setProbability(self, card, 0)
+
         self.checkForSolutionCards()
     
     #Cross off a card from possibilities
@@ -131,6 +139,8 @@ class BayesianLearner(Player):
             if other_card == card:
                 continue
             prob = self.ownersAndCards[owner][other_card]
+            if prob == 1 or prob == 0:
+                continue
             if prob>0.04:
                 self.setProbability(owner, other_card, prob-0.04)
             else:
@@ -175,7 +185,7 @@ class BayesianLearner(Player):
                     for owner in self.owners:
                         if not owner == responder:
                             for card in self.game.cards:
-                                if (not card == card_shown) and (not self.getProbability(owner, card) == 1) and (not self.getProbability(owner, card) == 0):
+                                if (not card == card_shown) and (not owner == self) and (not self.getProbability(owner, card) == 1) and (not self.getProbability(owner, card) == 0):
                                     prob = self.ownersAndCards[owner][card]
                                     if prob<0.97:
                                         self.setProbability(owner, card, prob + 0.03)
@@ -229,6 +239,8 @@ class BayesianLearner(Player):
     def normalizeCardAcrossPlayers(self, card, players):
         fractions = []
         for player in players:
+            if player == self:
+                continue
             prob = self.ownersAndCards[player][card]
             fractions.append((player, prob))
 

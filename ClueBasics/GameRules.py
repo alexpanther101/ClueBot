@@ -1,6 +1,7 @@
 import time 
 import random
 from .Card import Card
+from rl.Reward import Reward
 from collections import deque
 import logging 
 
@@ -26,6 +27,8 @@ class GameRules:
         self.solution = None # Will be set in reset_game()
         self.last_reward = 0.0 # New attribute to store the last calculated reward
         
+        self.reward_calculator = Reward(self)
+
         for card in self.SUSPECTS:
             suspect = Card("Suspect", card)
             self.suspectCards[card] = suspect
@@ -58,9 +61,9 @@ class GameRules:
         weapon = random.choice(self.WEAPONS)
         room = random.choice(self.ROOMS)
         self.solution = {
-            "suspect": self.suspectCards[suspect],
-            "weapon": self.weaponCards[weapon],
-            "room": self.roomCards[room]
+            "Suspect": self.suspectCards[suspect],
+            "Weapon": self.weaponCards[weapon],
+            "Room": self.roomCards[room]
         }
     
     def reset_game(self):
@@ -68,10 +71,14 @@ class GameRules:
         self.turn = 1
         self.gameTurn = 0
         self.suggestionLog.clear()
-        self.updateSolution()
+        self.solution = None  # Clear solution so dealCards creates a new one
+        self.last_reward = 0.0
+        # Reset reward calculator's tracking
+        self.reward_calculator.previous_entropy = {}
         for player in self.players:
             player.cards = []
             player.inGame = True
+            player.numCards = 0
 
     def makeAccusation(self, player, perp, weapon, room):
         """
@@ -82,6 +89,18 @@ class GameRules:
             perp == self.solution["Suspect"] and
             weapon == self.solution["Weapon"] and
             room == self.solution["Room"]
+        )
+        # Calculate confidence for the reward
+        confidence = 1.0
+        if hasattr(player, 'getProbability'):
+            suspect_conf = player.getProbability("Solution", perp)
+            weapon_conf = player.getProbability("Solution", weapon)
+            room_conf = player.getProbability("Solution", room)
+            confidence = suspect_conf * weapon_conf * room_conf
+        
+        # Use the Reward class to calculate accusation reward
+        self.last_reward = self.reward_calculator.calculate_accusation_reward(
+            is_correct, player, confidence
         )
         
         if is_correct:
@@ -101,71 +120,96 @@ class GameRules:
     
     
     def makeSuggestion(self, player, perp, weapon, room):
-        """Implements the suggestion mechanism. Returns the responder and the card shown""" 
+        """Implements the suggestion mechanism. Returns the responder and the card shown"""
         print(f"{player.name} suggests: {perp} with {weapon} in {room}")
         logging.info(f"{player.name} suggests: {perp} with {weapon} in {room}")
+        
         suggestionCards = [perp, weapon, room]
-        playerPos = self.players.index(player) 
-        i = (playerPos +1) % len(self.players)
+        playerPos = self.players.index(player)
+        i = (playerPos + 1) % len(self.players)
         
         suggestion_record = {
-        "turn": self.turn,  # or a turn counter if you have one
-        "suggester": player,
-        "suggestion": suggestionCards,
-        "ambiguous": True,
-        "responder": None,
-        "card_shown": None,
-        "possible_shown_cards": set(suggestionCards),
-        "skipped_players" : []
+            "turn": self.turn,
+            "suggester": player,
+            "suggestion": suggestionCards,
+            "ambiguous": True,
+            "responder": None,
+            "card_shown": None,
+            "possible_shown_cards": set(suggestionCards),
+            "skipped_players": []
         }
         
-        while(i!= playerPos):
-            print(self.players[i], end = " ")
+        skipped_players = []
+        responder = None
+        cardShown = None
+        
+        while i != playerPos:
+            print(self.players[i], end=" ")
             print("is checking their hand")
             logging.info(self.players[i].name + " is checking their hand")
             
             matching_cards = [c for c in suggestionCards if self.players[i].hasCard(c)]
+            
             if matching_cards:
-                # Ask player which card to reveal (RLPlayer overrides this)
                 cardShown = self.players[i].revealCard(matching_cards)
+                
+                # If this is an RL player revealing, calculate reveal reward
+                if hasattr(self.players[i], 'type') and self.players[i].type == "RL":
+                    reveal_reward = self.reward_calculator.calculate_reveal_reward(
+                        self.players[i], cardShown, matching_cards
+                    )
+                    # Store this for the revealing player
+                    if hasattr(self.players[i], 'store_transition'):
+                        next_obs = self.get_observation_for(self.players[i])
+                        self.players[i].store_transition(reveal_reward, next_obs, done=False)
             else:
                 cardShown = None
-
             
-            if(cardShown!=None):
+            if cardShown is not None:
                 suggestion_record['responder'] = self.players[i]
                 suggestion_record['card_shown'] = cardShown
+                responder = self.players[i]
                 self.suggestionLog.append(suggestion_record)
-                logging.info(f"{self.players[i].name} showed a card - {cardShown.name}" )
-                # reward the suggester a small positive signal if someone shows a card (info gain)
-                try:
-                    # Suggester is 'player' argument to makeSuggestion
-                    sugg = player
-                    reward_for_suggester = 0.1  # tuneable; small positive reward for getting info
-                    next_obs = self.get_observation_for(sugg)
-                    done = False
-                    if hasattr(sugg, "store_transition"):
-                        sugg.store_transition(reward_for_suggester, next_obs, done)
-                except Exception:
-                    pass
-                
-                return self.players[i], cardShown 
+                logging.info(f"{self.players[i].name} showed a card - {cardShown.name}")
+                break
             
             suggestion_record['skipped_players'].append(self.players[i])
-            i = (i + 1) % len(self.players)     
+            skipped_players.append(self.players[i])
+            i = (i + 1) % len(self.players)
         
-        self.suggestionLog.append(suggestion_record)
-        try:
-            sugg = player
-            reward_for_suggester = 0.2  # stronger signal — suggestion narrowed down
-            next_obs = self.get_observation_for(sugg)
-            done = False
-            if hasattr(sugg, "store_transition"):
-                sugg.store_transition(reward_for_suggester, next_obs, done)
-        except Exception:
-            pass    
-        return None, None
+        if responder is None:
+            self.suggestionLog.append(suggestion_record)
+        
+        # Use the Reward class to calculate suggestion reward
+        self.last_reward = self.reward_calculator.calculate_suggestion_reward(
+            suggester=player,
+            responder=responder,
+            card_shown=cardShown,
+            skipped_players=skipped_players,
+            suggestion_cards=suggestionCards
+        )
+        
+        # Also calculate step reward for belief updates
+        if hasattr(player, 'type') and player.type == "RL":
+            step_reward = self.reward_calculator.calculate_step_reward(player)
+            self.last_reward += step_reward
+        
+        return responder, cardShown
     
+    def calculate_accusation_reward(self, is_correct):
+        """Delegates to Reward class (kept for compatibility)"""
+        # This is now handled in makeAccusation
+        return self.last_reward
+
+    def calculate_suggestion_reward(self, responder, rl_player, last_log_len):
+        """Delegates to Reward class (kept for compatibility)"""
+        # This is now handled in makeSuggestion
+        return self.last_reward
+
+    def calculate_reveal_reward(self, revealed_card):
+        """Delegates to Reward class (kept for compatibility)"""
+        # This is now handled in makeSuggestion when a card is revealed
+        return self.last_reward
     
     def getPublicSuggestionLog(self, player):
         """Returns a log of the suggestions made, adjusting the visibility of the cards shown based on the player calling this function"""
@@ -189,36 +233,58 @@ class GameRules:
     
     def dealCards(self):
         """Deals and rules out initial cards"""
-        self.solution = {
-            "Suspect" : random.choice(list(self.suspectCards.values())),
-            "Weapon" : random.choice(list(self.weaponCards.values())),
-            "Room" : random.choice(list(self.roomCards.values()))
-        }
         
-        #Take out solution cards from deck
-        self.deck.pop((self.solution.get("Suspect")).getName())
-        self.deck.pop((self.solution.get("Weapon")).getName())
-        self.deck.pop((self.solution.get("Room")).getName())
+        # Reinitialize the deck to ensure all cards are present
+        self.deck = {}
+        for card_name, card_obj in {**self.suspectCards, **self.weaponCards, **self.roomCards}.items():
+            self.deck[card_name] = card_obj
         
-        logging.info("Solution cards are "+(self.solution.get("Suspect")).getName()+ ", "+self.solution.get("Weapon").getName()+", "+self.solution.get("Room").getName())
+        # Create solution (don't overwrite if already set by updateSolution)
+        if not self.solution:
+            self.solution = {
+                "Suspect": random.choice(list(self.suspectCards.values())),
+                "Weapon": random.choice(list(self.weaponCards.values())),
+                "Room": random.choice(list(self.roomCards.values()))
+            }
         
+        # Remove solution cards from deck
+        try:
+            suspect_name = self.solution.get("Suspect").getName()
+            weapon_name = self.solution.get("Weapon").getName()
+            room_name = self.solution.get("Room").getName()
+            
+            print(f"Removing solution cards: {suspect_name}, {weapon_name}, {room_name}")
+            print(f"Available deck keys: {list(self.deck.keys())}")
+            
+            self.deck.pop(suspect_name)
+            self.deck.pop(weapon_name)
+            self.deck.pop(room_name)
+            
+        except KeyError as e:
+            print(f"KeyError when removing solution card: {e}")
+            print(f"Solution: {self.solution}")
+            print(f"Deck keys: {list(self.deck.keys())}")
+            raise
+        
+        logging.info(f"Solution cards are {suspect_name}, {weapon_name}, {room_name}")
+        
+        # Deal remaining cards
         deckCards = list(self.deck.keys())
         random.shuffle(deckCards)
-        playerIter =0
+        playerIter = 0
         for card in deckCards:
             self.players[playerIter].isDealt(self.deck.get(card))
-            playerIter+=1
-            if(playerIter==len(self.players)):
+            playerIter += 1
+            if playerIter == len(self.players):
                 playerIter = 0
                 
         for player in self.players:
-            print(player.name + " has " + str(player.numCards)+" cards")
-            logging.info(player.name + " has " + str(player.numCards)+" cards")
+            print(player.name + " has " + str(player.numCards) + " cards")
+            logging.info(player.name + " has " + str(player.numCards) + " cards")
             player.initialCrossOff()
             if player.type == "Human":
-                    player.revealCards()
-                    
-                    
+                player.revealCards()      
+                        
     def checkAllPlayers(self):
         """Checks to see if there are still enough players left"""   
         count =0
@@ -276,7 +342,7 @@ class GameRules:
         return self.last_reward
 
     # ... (unchanged RL API methods)
-    def getObservation(self, player):
+    def get_observation_for(self, player):
         """Returns the observation for a given player"""
         from rl.utils import build_observation
         return build_observation(self, player)
